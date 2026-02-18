@@ -2,3 +2,6 @@ project_id = "nxihxkjqxyqopydxzics"
 
 [functions.buscar-producto]
 verify_jwt = false
+
+[functions.parsear-presupuesto]
+verify_jwt = false

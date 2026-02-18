@@ -1,39 +1,40 @@
 import { useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Mic, MicOff, Loader2 } from "lucide-react";
+import { Mic, MicOff, Loader2, Wand2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PresupuestoItem } from "@/types/presupuesto";
+import { calcularSubtotalItem } from "@/types/presupuesto";
 import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
 
-interface ScrapedProduct {
-  nombre: string;
-  precio: number;
-  imagen: string | null;
-  link?: string;
+interface EnrichedItem {
+  producto_nombre: string;
+  producto_imagen: string | null;
+  tipo: "material" | "mano_obra";
+  precio_unitario: number;
+  cantidad: number;
+  descuento: number;
+  fuente: string;
+}
+
+interface ParseResult {
+  cliente_nombre: string;
+  cliente_direccion: string;
+  cliente_telefono: string;
+  items: EnrichedItem[];
+  transcript: string;
 }
 
 interface Props {
-  onAddItem: (item: Omit<PresupuestoItem, "id" | "subtotal">) => void;
+  onResult: (result: ParseResult) => void;
 }
 
-const VoiceDictation = ({ onAddItem }: Props) => {
+const VoiceDictation = ({ onResult }: Props) => {
   const [listening, setListening] = useState(false);
-  const [searching, setSearching] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const [transcript, setTranscript] = useState("");
-  const [results, setResults] = useState<ScrapedProduct[]>([]);
-  const [showResults, setShowResults] = useState(false);
-  const [selectedIdx, setSelectedIdx] = useState(0);
+  const [interimText, setInterimText] = useState("");
   const recognitionRef = useRef<any>(null);
+  const fullTranscriptRef = useRef("");
 
   const startListening = useCallback(() => {
     const SpeechRecognition =
@@ -46,200 +47,182 @@ const VoiceDictation = ({ onAddItem }: Props) => {
 
     const recognition = new SpeechRecognition();
     recognition.lang = "es-AR";
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.continuous = true;
+    recognition.interimResults = true;
 
-    recognition.onresult = async (event: any) => {
-      const text = event.results[0][0].transcript;
-      setTranscript(text);
-      setListening(false);
-      await searchProduct(text);
+    fullTranscriptRef.current = "";
+    setTranscript("");
+    setInterimText("");
+
+    recognition.onresult = (event: any) => {
+      let finalText = "";
+      let interim = "";
+
+      for (let i = 0; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          finalText += result[0].transcript + " ";
+        } else {
+          interim += result[0].transcript;
+        }
+      }
+
+      if (finalText) {
+        fullTranscriptRef.current = finalText.trim();
+        setTranscript(finalText.trim());
+      }
+      setInterimText(interim);
     };
 
     recognition.onerror = (event: any) => {
       console.error("Speech error:", event.error);
-      setListening(false);
       if (event.error === "not-allowed") {
         toast.error("Permití el acceso al micrófono para usar el dictado.");
-      } else {
-        toast.error("Error en el reconocimiento de voz. Intentá de nuevo.");
+        setListening(false);
+      }
+      // Don't stop on "no-speech" — keep listening
+    };
+
+    recognition.onend = () => {
+      // If still in listening mode, restart (browser sometimes stops continuous)
+      if (recognitionRef.current && listening) {
+        try {
+          recognition.start();
+        } catch {
+          setListening(false);
+        }
       }
     };
 
-    recognition.onend = () => setListening(false);
-
     recognitionRef.current = recognition;
-    recognition.start();
-    setListening(true);
-    setTranscript("");
-  }, []);
-
-  const stopListening = useCallback(() => {
-    recognitionRef.current?.stop();
-    setListening(false);
-  }, []);
-
-  const searchProduct = async (text: string) => {
-    setSearching(true);
     try {
-      const { data, error } = await supabase.functions.invoke("buscar-producto", {
-        body: { query: text },
+      recognition.start();
+      setListening(true);
+      toast.info("🎤 Dictá el presupuesto completo. Cuando termines, tocá 'Procesar'.");
+    } catch {
+      toast.error("No se pudo iniciar el micrófono.");
+    }
+  }, [listening]);
+
+  const stopAndProcess = useCallback(async () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.onend = null; // prevent restart
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    setListening(false);
+    setInterimText("");
+
+    const finalTranscript = fullTranscriptRef.current;
+    if (!finalTranscript || finalTranscript.length < 5) {
+      toast.error("No se capturó suficiente audio. Intentá de nuevo.");
+      return;
+    }
+
+    setProcessing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("parsear-presupuesto", {
+        body: { transcript: finalTranscript },
       });
 
       if (error) throw error;
-
-      if (data?.found && data.products?.length > 0) {
-        setResults(data.products);
-        setSelectedIdx(0);
-        setShowResults(true);
-      } else {
-        // Not found — add as literal manual item
-        toast.info(`No se encontró "${text}" en tiendapisos.com. Se agrega como producto manual.`);
-        onAddItem({
-          producto_nombre: text,
-          producto_imagen: null,
-          tipo: "material",
-          precio_unitario: 0,
-          cantidad: 1,
-          descuento: 0,
-        });
+      if (data?.error) {
+        toast.error(data.error);
+        return;
       }
+
+      const itemCount = data.items?.length || 0;
+      const fromTienda = data.items?.filter((i: any) => i.fuente === "tiendapisos").length || 0;
+      const manual = itemCount - fromTienda;
+
+      toast.success(
+        `✅ Presupuesto interpretado: ${itemCount} productos${fromTienda > 0 ? ` (${fromTienda} con precio de tiendapisos.com)` : ""}${manual > 0 ? ` (${manual} sin precio, completalos)` : ""}`
+      );
+
+      onResult(data as ParseResult);
     } catch (err: any) {
-      console.error("Search error:", err);
-      toast.error("Error buscando el producto. Se agrega como texto literal.");
-      onAddItem({
-        producto_nombre: text,
-        producto_imagen: null,
-        tipo: "material",
-        precio_unitario: 0,
-        cantidad: 1,
-        descuento: 0,
-      });
+      console.error("Parse error:", err);
+      toast.error("Error procesando el dictado: " + (err.message || "Intentá de nuevo"));
     } finally {
-      setSearching(false);
+      setProcessing(false);
     }
-  };
+  }, [onResult]);
 
-  const handleConfirm = () => {
-    const product = results[selectedIdx];
-    if (product) {
-      onAddItem({
-        producto_nombre: product.nombre,
-        producto_imagen: product.imagen,
-        tipo: "material",
-        precio_unitario: product.precio,
-        cantidad: 1,
-        descuento: 0,
-      });
-      toast.success(`"${product.nombre}" agregado desde tiendapisos.com`);
+  const cancel = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.onend = null;
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
     }
-    setShowResults(false);
-    setResults([]);
-  };
-
-  const handleAddLiteral = () => {
-    onAddItem({
-      producto_nombre: transcript,
-      producto_imagen: null,
-      tipo: "material",
-      precio_unitario: 0,
-      cantidad: 1,
-      descuento: 0,
-    });
-    toast.info(`"${transcript}" agregado como producto manual.`);
-    setShowResults(false);
-    setResults([]);
-  };
+    setListening(false);
+    setTranscript("");
+    setInterimText("");
+    fullTranscriptRef.current = "";
+  }, []);
 
   return (
-    <>
-      <div className="flex items-center gap-2">
-        <Button
-          type="button"
-          variant={listening ? "destructive" : "outline"}
-          size="icon"
-          onClick={listening ? stopListening : startListening}
-          disabled={searching}
-          className="relative"
-          title={listening ? "Detener dictado" : "Dictar producto por voz"}
-        >
-          {searching ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : listening ? (
-            <>
-              <MicOff className="h-4 w-4" />
-              <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-red-500 animate-pulse" />
-            </>
-          ) : (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        {!listening && !processing && (
+          <Button
+            type="button"
+            onClick={startListening}
+            variant="outline"
+            className="gap-2"
+          >
             <Mic className="h-4 w-4" />
-          )}
-        </Button>
+            Dictar presupuesto
+          </Button>
+        )}
+
         {listening && (
-          <span className="text-sm text-muted-foreground animate-pulse">
-            Escuchando...
-          </span>
+          <>
+            <Button
+              type="button"
+              onClick={stopAndProcess}
+              className="gap-2"
+            >
+              <Wand2 className="h-4 w-4" />
+              Procesar dictado
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={cancel}
+              size="sm"
+            >
+              Cancelar
+            </Button>
+            <span className="flex items-center gap-1.5 text-sm text-destructive font-medium">
+              <span className="h-2 w-2 rounded-full bg-destructive animate-pulse" />
+              Grabando...
+            </span>
+          </>
         )}
-        {searching && (
-          <span className="text-sm text-muted-foreground">
-            Buscando en tiendapisos.com...
-          </span>
-        )}
-        {transcript && !listening && !searching && (
-          <span className="text-sm text-muted-foreground">
-            Escuché: "<strong>{transcript}</strong>"
+
+        {processing && (
+          <span className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Interpretando dictado y buscando precios en tiendapisos.com...
           </span>
         )}
       </div>
 
-      <Dialog open={showResults} onOpenChange={setShowResults}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Productos encontrados</DialogTitle>
-            <DialogDescription>
-              Buscaste "{transcript}" en tiendapisos.com. Seleccioná el producto correcto:
-            </DialogDescription>
-          </DialogHeader>
-
-          <RadioGroup
-            value={String(selectedIdx)}
-            onValueChange={(v) => setSelectedIdx(Number(v))}
-            className="space-y-3 max-h-64 overflow-auto"
-          >
-            {results.map((p, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-3 p-2 rounded-md border cursor-pointer hover:bg-accent transition-colors"
-                onClick={() => setSelectedIdx(i)}
-              >
-                <RadioGroupItem value={String(i)} id={`product-${i}`} />
-                {p.imagen && (
-                  <img
-                    src={p.imagen}
-                    alt=""
-                    className="h-10 w-10 rounded object-cover flex-shrink-0"
-                  />
-                )}
-                <Label htmlFor={`product-${i}`} className="flex-1 cursor-pointer">
-                  <p className="font-medium text-sm">{p.nombre}</p>
-                  {p.precio > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      ${p.precio.toLocaleString("es-AR")}
-                    </p>
-                  )}
-                </Label>
-              </div>
-            ))}
-          </RadioGroup>
-
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button variant="ghost" onClick={handleAddLiteral} className="text-sm">
-              Agregar como texto literal
-            </Button>
-            <Button onClick={handleConfirm}>Agregar seleccionado</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+      {(listening || transcript) && (
+        <div className="rounded-md border bg-muted/50 p-3 text-sm max-h-32 overflow-auto">
+          <p className="text-muted-foreground text-xs mb-1 font-medium">Transcripción:</p>
+          <p>
+            {transcript}
+            {interimText && (
+              <span className="text-muted-foreground italic"> {interimText}</span>
+            )}
+            {!transcript && !interimText && (
+              <span className="text-muted-foreground italic">Esperando que hables...</span>
+            )}
+          </p>
+        </div>
+      )}
+    </div>
   );
 };
 
