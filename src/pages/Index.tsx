@@ -48,13 +48,35 @@ const Index = () => {
     setItems((prev) => [...prev, newItem]);
   }, []);
 
-  const addVoiceItem = useCallback((item: Omit<PresupuestoItem, "id" | "subtotal">) => {
-    const newItem: PresupuestoItem = {
+  const handleVoiceResult = useCallback((result: {
+    cliente_nombre: string;
+    cliente_direccion: string;
+    cliente_telefono: string;
+    items: Array<{
+      producto_nombre: string;
+      producto_imagen: string | null;
+      tipo: "material" | "mano_obra";
+      precio_unitario: number;
+      cantidad: number;
+      descuento: number;
+    }>;
+  }) => {
+    if (result.cliente_nombre) setClienteNombre(result.cliente_nombre);
+    if (result.cliente_direccion) setClienteDireccion(result.cliente_direccion);
+    if (result.cliente_telefono) setClienteTelefono(result.cliente_telefono);
+
+    const newItems: PresupuestoItem[] = result.items.map((item) => ({
       id: crypto.randomUUID(),
-      ...item,
-      subtotal: item.precio_unitario * item.cantidad * (1 - item.descuento / 100),
-    };
-    setItems((prev) => [...prev, newItem]);
+      producto_nombre: item.producto_nombre,
+      producto_imagen: item.producto_imagen,
+      tipo: item.tipo,
+      precio_unitario: item.precio_unitario,
+      cantidad: item.cantidad,
+      descuento: item.descuento,
+      subtotal: calcularSubtotalItem(item),
+    }));
+
+    setItems((prev) => [...prev, ...newItems]);
   }, []);
 
   const addManualItem = useCallback(() => {
@@ -200,8 +222,8 @@ const Index = () => {
 
             {/* Voice dictation */}
             <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">Dictar producto por voz</Label>
-              <VoiceDictation onAddItem={addVoiceItem} />
+              <Label className="text-xs text-muted-foreground mb-1 block">Dictar presupuesto completo por voz</Label>
+              <VoiceDictation onResult={handleVoiceResult} />
             </div>
 
             {/* Manual entry */}
