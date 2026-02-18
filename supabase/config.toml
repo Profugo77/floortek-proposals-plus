@@ -1,1 +1,4 @@
 project_id = "nxihxkjqxyqopydxzics"
+
+[functions.buscar-producto]
+verify_jwt = false

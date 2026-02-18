@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { generatePresupuestoPdf } from "@/lib/generatePdf";
 import { toast } from "sonner";
 import { Plus, FileDown, Save, Package } from "lucide-react";
+import VoiceDictation from "@/components/VoiceDictation";
 
 const Index = () => {
   const [clienteNombre, setClienteNombre] = useState("");
@@ -43,6 +44,15 @@ const Index = () => {
       cantidad: 1,
       descuento: 0,
       subtotal: producto.precio,
+    };
+    setItems((prev) => [...prev, newItem]);
+  }, []);
+
+  const addVoiceItem = useCallback((item: Omit<PresupuestoItem, "id" | "subtotal">) => {
+    const newItem: PresupuestoItem = {
+      id: crypto.randomUUID(),
+      ...item,
+      subtotal: item.precio_unitario * item.cantidad * (1 - item.descuento / 100),
     };
     setItems((prev) => [...prev, newItem]);
   }, []);
@@ -186,6 +196,12 @@ const Index = () => {
             <div>
               <Label className="text-xs text-muted-foreground mb-1 block">Buscar en catálogo</Label>
               <ProductoSearch onSelect={addProducto} />
+            </div>
+
+            {/* Voice dictation */}
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Dictar producto por voz</Label>
+              <VoiceDictation onAddItem={addVoiceItem} />
             </div>
 
             {/* Manual entry */}
