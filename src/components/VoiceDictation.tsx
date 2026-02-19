@@ -68,8 +68,10 @@ const VoiceDictation = ({ onResult }: Props) => {
         }
       }
 
-      if (finalText) {
-        fullTranscriptRef.current = finalText.trim();
+      // Always update with the best available text (final + interim)
+      const allText = (finalText + interim).trim();
+      if (allText) {
+        fullTranscriptRef.current = allText;
         setTranscript(finalText.trim());
       }
       setInterimText(interim);
