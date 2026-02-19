@@ -37,8 +37,9 @@ const Index = () => {
   }, []);
 
   const addProducto = useCallback((producto: Producto) => {
+    const itemId = crypto.randomUUID();
     const newItem: PresupuestoItem = {
-      id: crypto.randomUUID(),
+      id: itemId,
       producto_nombre: producto.nombre,
       producto_imagen: producto.imagen_url,
       tipo: producto.tipo,
@@ -48,6 +49,25 @@ const Index = () => {
       subtotal: producto.precio,
     };
     setItems((prev) => [...prev, newItem]);
+
+    // Enrich with image/description from tiendapisos in background
+    supabase.functions.invoke("enriquecer-producto", {
+      body: { nombre: producto.nombre },
+    }).then(({ data }) => {
+      if (data?.imagen || data?.descripcion) {
+        setItems((prev) =>
+          prev.map((item) =>
+            item.id === itemId
+              ? {
+                  ...item,
+                  producto_imagen: data.imagen || item.producto_imagen,
+                  producto_descripcion: data.descripcion || item.producto_descripcion,
+                }
+              : item
+          )
+        );
+      }
+    }).catch(() => {});
   }, []);
 
   const handleVoiceResult = useCallback((result: {
@@ -93,8 +113,9 @@ const Index = () => {
       toast.error("El precio debe ser un número válido");
       return;
     }
+    const itemId = crypto.randomUUID();
     const newItem: PresupuestoItem = {
-      id: crypto.randomUUID(),
+      id: itemId,
       producto_nombre: manualNombre,
       producto_imagen: null,
       tipo: manualTipo,
@@ -104,8 +125,30 @@ const Index = () => {
       subtotal: precio,
     };
     setItems((prev) => [...prev, newItem]);
+    const nombreToEnrich = manualNombre;
     setManualNombre("");
     setManualPrecio("");
+
+    // Enrich with image/description from tiendapisos in background
+    if (manualTipo === "material") {
+      supabase.functions.invoke("enriquecer-producto", {
+        body: { nombre: nombreToEnrich },
+      }).then(({ data }) => {
+        if (data?.imagen || data?.descripcion) {
+          setItems((prev) =>
+            prev.map((item) =>
+              item.id === itemId
+                ? {
+                    ...item,
+                    producto_imagen: data.imagen || item.producto_imagen,
+                    producto_descripcion: data.descripcion || item.producto_descripcion,
+                  }
+                : item
+            )
+          );
+        }
+      }).catch(() => {});
+    }
   }, [manualNombre, manualPrecio, manualTipo]);
 
   const updateItem = useCallback((index: number, field: string, value: string | number) => {
