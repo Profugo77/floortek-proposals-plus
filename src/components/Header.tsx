@@ -52,6 +52,16 @@ const Header = () => {
           >
             Productos
           </Link>
+          <Link
+            to="/usuarios"
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              location.pathname === "/usuarios"
+                ? "bg-primary-foreground/20"
+                : "hover:bg-primary-foreground/10"
+            }`}
+          >
+            Usuarios
+          </Link>
           <Button
             variant="ghost"
             size="sm"
