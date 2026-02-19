@@ -5,6 +5,35 @@ import { Presupuesto, calcularSubtotalItem } from "@/types/presupuesto";
 const EMERALD = [0, 121, 107] as const;
 const fmt = (n: number) => `$${n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+/** Load an image as base64 data URL, handling CORS via proxy fallback */
+async function loadImageAsDataUrl(url: string): Promise<string | null> {
+  const tryLoad = (src: string): Promise<string | null> =>
+    new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL("image/jpeg", 0.85));
+        } catch {
+          resolve(null);
+        }
+      };
+      img.onerror = () => resolve(null);
+      img.src = src;
+    });
+
+  let result = await tryLoad(url);
+  if (result) return result;
+
+  const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+  result = await tryLoad(proxyUrl);
+  return result;
+}
 export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
   const doc = new jsPDF();
   const pageW = doc.internal.pageSize.getWidth();
@@ -143,74 +172,78 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
   );
 
   if (catalogItems.length > 0) {
-    // Start on a new page for catalog
-    doc.addPage();
-    let catY = 15;
+    const pageH = doc.internal.pageSize.getHeight();
 
-    // Catalog header
-    doc.setFillColor(...EMERALD);
-    doc.rect(0, 0, pageW, 25, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.text("Detalle de Productos", pageW / 2, 16, { align: "center" });
+    for (let ci = 0; ci < catalogItems.length; ci++) {
+      const item = catalogItems[ci];
+      doc.addPage();
 
-    catY = 35;
+      // Header bar
+      doc.setFillColor(...EMERALD);
+      doc.rect(0, 0, pageW, 25, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("Detalle de Producto", pageW / 2, 16, { align: "center" });
 
-    for (const item of catalogItems) {
-      // Check if we need a new page (each card ~70px tall)
-      if (catY + 75 > doc.internal.pageSize.getHeight() - 20) {
-        doc.addPage();
-        catY = 15;
-      }
+      let catY = 35;
 
-      // Card background
-      doc.setFillColor(248, 248, 248);
-      doc.roundedRect(10, catY, pageW - 20, 65, 3, 3, "F");
-      doc.setDrawColor(220, 220, 220);
-      doc.roundedRect(10, catY, pageW - 20, 65, 3, 3, "S");
+      // Product name - large
+      doc.setTextColor(...EMERALD);
+      doc.setFontSize(18);
+      doc.setFont("helvetica", "bold");
+      const nameLines = doc.splitTextToSize(item.producto_nombre, pageW - 30);
+      doc.text(nameLines, 15, catY + 8);
+      catY += 8 + nameLines.length * 8 + 5;
 
-      let textX = 15;
+      // Price
+      doc.setTextColor(60, 60, 60);
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text(`Precio: ${fmt(item.precio_unitario)} / unidad`, 15, catY);
+      catY += 12;
 
-      // Try to load product image
+      // Large product image (centered, up to 130x130mm)
       if (item.producto_imagen) {
-        try {
-          const img = new Image();
-          img.crossOrigin = "anonymous";
-          await new Promise<void>((resolve, reject) => {
-            img.onload = () => resolve();
-            img.onerror = () => reject();
-            img.src = item.producto_imagen!;
-          });
-          doc.addImage(img, "JPEG", 15, catY + 5, 50, 50);
-          textX = 70;
-        } catch {
-          // Skip image if can't load
+        const imgData = await loadImageAsDataUrl(item.producto_imagen);
+        if (imgData) {
+          const imgSize = 130;
+          const imgX = (pageW - imgSize) / 2;
+          doc.addImage(imgData, "JPEG", imgX, catY, imgSize, imgSize);
+          catY += imgSize + 10;
         }
       }
 
-      // Product name
-      doc.setTextColor(...EMERALD);
-      doc.setFontSize(11);
-      doc.setFont("helvetica", "bold");
-      doc.text(item.producto_nombre, textX, catY + 12);
-
-      // Price
-      doc.setTextColor(80, 80, 80);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.text(fmt(item.precio_unitario) + " / unidad", textX, catY + 20);
-
       // Description
       if (item.producto_descripcion) {
-        doc.setFontSize(8);
+        if (catY + 30 > pageH - 30) {
+          doc.addPage();
+          catY = 20;
+        }
+        doc.setFillColor(245, 245, 245);
+        const descBoxY = catY;
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...EMERALD);
+        doc.text("Descripción del producto:", 15, catY + 8);
+        doc.setFontSize(9);
         doc.setFont("helvetica", "normal");
-        doc.setTextColor(100, 100, 100);
-        const descLines = doc.splitTextToSize(item.producto_descripcion, pageW - textX - 20);
-        doc.text(descLines.slice(0, 5), textX, catY + 28);
+        doc.setTextColor(80, 80, 80);
+        const descLines = doc.splitTextToSize(item.producto_descripcion, pageW - 30);
+        const linesToShow = descLines.slice(0, 12);
+        doc.text(linesToShow, 15, catY + 16);
+        const boxH = 20 + linesToShow.length * 4.5;
+        doc.roundedRect(10, descBoxY - 2, pageW - 20, boxH, 2, 2, "F");
+        // Re-draw text on top of background
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...EMERALD);
+        doc.text("Descripción del producto:", 15, catY + 8);
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(80, 80, 80);
+        doc.text(linesToShow, 15, catY + 16);
       }
-
-      catY += 72;
     }
   }
 
