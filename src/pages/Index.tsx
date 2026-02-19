@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
+import { Textarea } from "@/components/ui/textarea";
 import Header from "@/components/Header";
 import ClienteForm from "@/components/ClienteForm";
 import ProductoSearch from "@/components/ProductoSearch";
@@ -21,6 +22,7 @@ const Index = () => {
   const [clienteDireccion, setClienteDireccion] = useState("");
   const [clienteTelefono, setClienteTelefono] = useState("");
   const [items, setItems] = useState<PresupuestoItem[]>([]);
+  const [comentarios, setComentarios] = useState("");
   const [saving, setSaving] = useState(false);
 
   // Manual item fields
@@ -140,6 +142,7 @@ const Index = () => {
           cliente_nombre: clienteNombre,
           cliente_direccion: clienteDireccion,
           cliente_telefono: clienteTelefono,
+          comentarios,
           fecha: new Date().toISOString().split("T")[0],
           subtotal_materiales: totales.subtotal_materiales,
           subtotal_mano_obra: totales.subtotal_mano_obra,
@@ -187,6 +190,7 @@ const Index = () => {
       setClienteNombre("");
       setClienteDireccion("");
       setClienteTelefono("");
+      setComentarios("");
       setItems([]);
     } catch (err: any) {
       toast.error("Error al guardar: " + (err.message || "Error desconocido"));
@@ -264,6 +268,19 @@ const Index = () => {
 
             {/* Items table */}
             <ItemsTable items={items} onUpdate={updateItem} onRemove={removeItem} />
+          </CardContent>
+        </Card>
+
+        {/* Comments */}
+        <Card>
+          <CardContent className="pt-4">
+            <Label className="text-sm font-medium mb-2 block">Comentarios / Observaciones</Label>
+            <Textarea
+              placeholder="Notas generales del presupuesto..."
+              value={comentarios}
+              onChange={(e) => setComentarios(e.target.value)}
+              rows={3}
+            />
           </CardContent>
         </Card>
 

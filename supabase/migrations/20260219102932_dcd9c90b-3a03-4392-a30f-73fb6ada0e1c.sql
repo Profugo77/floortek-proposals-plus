@@ -1,0 +1,1 @@
+ALTER TABLE public.presupuestos ADD COLUMN comentarios text NOT NULL DEFAULT '';

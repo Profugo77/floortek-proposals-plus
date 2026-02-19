@@ -123,6 +123,19 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
   doc.text("TOTAL:", totalsX, tY);
   doc.text(fmt(presupuesto.total), valX, tY, { align: "right" });
 
+  // Comments section
+  if (presupuesto.comentarios) {
+    const commY = tY + 12;
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(80, 80, 80);
+    doc.text("COMENTARIOS:", 10, commY);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    const lines = doc.splitTextToSize(presupuesto.comentarios, pageW - 20);
+    doc.text(lines, 10, commY + 6);
+  }
+
   // Footer - Terms
   const footerY = doc.internal.pageSize.getHeight() - 30;
   doc.setDrawColor(200, 200, 200);

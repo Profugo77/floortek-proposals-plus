@@ -26,6 +26,7 @@ export interface Presupuesto {
   cliente_telefono: string;
   fecha: string;
   items: PresupuestoItem[];
+  comentarios?: string;
   subtotal_materiales: number;
   subtotal_mano_obra: number;
   iva: number;
