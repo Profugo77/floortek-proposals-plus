@@ -165,9 +165,14 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
   }
 
   // Product catalog section — only items with image or description from tiendapisos
+  console.log('[PDF] Items count:', presupuesto.items.length);
+  presupuesto.items.forEach((item, i) => {
+    console.log(`[PDF] Item ${i}: imagen=${item.producto_imagen ? 'YES (' + item.producto_imagen.substring(0, 30) + '...)' : 'NO'}, desc=${item.producto_descripcion ? 'YES (' + item.producto_descripcion.substring(0, 50) + '...)' : 'NO'}`);
+  });
   const catalogItems = presupuesto.items.filter(
     (item) => item.producto_imagen || item.producto_descripcion
   );
+  console.log('[PDF] Catalog items (with image/desc):', catalogItems.length);
 
   if (catalogItems.length > 0) {
     const pageH = doc.internal.pageSize.getHeight();
