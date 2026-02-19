@@ -82,15 +82,35 @@ async function buscarEnBaseDeDatos(productName: string): Promise<{ precio: numbe
   return null;
 }
 
+async function imageUrlToBase64(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+    });
+    if (!res.ok) return null;
+    const buf = await res.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    const b64 = btoa(binary);
+    const contentType = res.headers.get('content-type') || 'image/jpeg';
+    return `data:${contentType};base64,${b64}`;
+  } catch (e) {
+    console.error('Error converting image to base64:', e);
+    return null;
+  }
+}
+
 async function buscarEnTiendaPisos(productName: string): Promise<{ imagen: string | null; descripcion: string | null } | null> {
   try {
-    // Build product URL slug from name: "Roble Fox SP001 5 mm con manta" -> "roble-fox-sp001-5-mm-con-manta"
     const slug = productName
       .toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove accents
-      .replace(/[^a-z0-9\s-]/g, '') // remove special chars
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9\s-]/g, '')
       .trim()
-      .replace(/\s+/g, '-'); // spaces to hyphens
+      .replace(/\s+/g, '-');
 
     const productUrl = `https://tiendapisos.com/producto/${slug}/`;
     console.log(`Fetching product page: ${productUrl}`);
@@ -109,19 +129,17 @@ async function buscarEnTiendaPisos(productName: string): Promise<{ imagen: strin
 
     const html = await res.text();
 
-    // Check if it's a 404 page
     if (html.includes('No se encontró esa página') || html.includes('error404')) {
       console.log('Product page is 404');
       return null;
     }
 
-    // Extract main product image (800x800 jpg, not the logo png)
+    // Extract main product image URL
     const imgMatch = html.match(/<img[^>]*width="800"[^>]*src="(https:\/\/tiendapisos\.com\/wp-content\/uploads\/[^"]*\.jpg)"/i)
       || html.match(/<img[^>]*src="(https:\/\/tiendapisos\.com\/wp-content\/uploads\/[^"]*\.jpg)"[^>]*width="800"/i)
       || html.match(/<img[^>]*src="(https:\/\/tiendapisos\.com\/wp-content\/uploads\/\d{4}\/\d{2}\/[^"]*\.jpg)"/i);
 
-    // Extract short description (the h2 subtitle that describes the product)
-    // Pattern: first h2 is the product name, second h2 is the description
+    // Extract description
     const h2Matches = [...html.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/gi)];
     let descripcion: string | null = null;
     for (const m of h2Matches) {
@@ -132,7 +150,6 @@ async function buscarEnTiendaPisos(productName: string): Promise<{ imagen: strin
       }
     }
 
-    // Also try the "Piso vinílico SPC..." style description
     if (!descripcion) {
       const descMatch = html.match(/Piso\s+(?:vin[ií]lico|flotante|SPC|laminado)[^<]{10,500}/i);
       if (descMatch) {
@@ -140,8 +157,15 @@ async function buscarEnTiendaPisos(productName: string): Promise<{ imagen: strin
       }
     }
 
-    const imagen = imgMatch?.[1] || null;
-    console.log(`Product page result: img=${!!imagen}, desc=${!!descripcion}`);
+    const imgUrl = imgMatch?.[1] || null;
+    
+    // Convert image to base64 server-side to avoid CORS issues on client
+    let imagen: string | null = null;
+    if (imgUrl) {
+      console.log(`Downloading image: ${imgUrl}`);
+      imagen = await imageUrlToBase64(imgUrl);
+      console.log(`Image converted to base64: ${imagen ? 'yes (' + imagen.length + ' chars)' : 'no'}`);
+    }
     
     return { imagen, descripcion };
   } catch (e) {

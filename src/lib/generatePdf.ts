@@ -5,34 +5,32 @@ import { Presupuesto, calcularSubtotalItem } from "@/types/presupuesto";
 const EMERALD = [0, 121, 107] as const;
 const fmt = (n: number) => `$${n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-/** Load an image as base64 data URL, handling CORS via proxy fallback */
-async function loadImageAsDataUrl(url: string): Promise<string | null> {
-  const tryLoad = (src: string): Promise<string | null> =>
-    new Promise((resolve) => {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => {
-        try {
-          const canvas = document.createElement("canvas");
-          canvas.width = img.naturalWidth;
-          canvas.height = img.naturalHeight;
-          const ctx = canvas.getContext("2d");
-          ctx?.drawImage(img, 0, 0);
-          resolve(canvas.toDataURL("image/jpeg", 0.85));
-        } catch {
-          resolve(null);
-        }
-      };
-      img.onerror = () => resolve(null);
-      img.src = src;
-    });
+/** Load an image - supports both base64 data URLs and regular URLs */
+async function loadImageForPdf(url: string): Promise<string | null> {
+  // If already a data URL (base64 from server), use directly
+  if (url.startsWith('data:')) {
+    return url;
+  }
 
-  let result = await tryLoad(url);
-  if (result) return result;
-
-  const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
-  result = await tryLoad(proxyUrl);
-  return result;
+  // For regular URLs, try loading via Image element
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      } catch {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
 }
 export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
   const doc = new jsPDF();
@@ -205,7 +203,7 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
 
       // Large product image (centered, up to 130x130mm)
       if (item.producto_imagen) {
-        const imgData = await loadImageAsDataUrl(item.producto_imagen);
+        const imgData = await loadImageForPdf(item.producto_imagen);
         if (imgData) {
           const imgSize = 130;
           const imgX = (pageW - imgSize) / 2;
