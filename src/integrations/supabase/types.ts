@@ -136,12 +136,37 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          approved: boolean
+          created_at: string
+          email: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          approved?: boolean
+          created_at?: string
+          email?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          approved?: boolean
+          created_at?: string
+          email?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
       get_next_presupuesto_numero: { Args: never; Returns: number }
+      is_approved: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
