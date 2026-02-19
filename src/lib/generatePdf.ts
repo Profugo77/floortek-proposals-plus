@@ -282,14 +282,18 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
     drawFooter(doc);
   }
 
-  // Product catalog section (collect all items from alternativas or main)
+  // Product catalog section (collect all items from alternativas or main, deduplicate by name)
   const allItems = hasAlternativas
     ? presupuesto.alternativas!.flatMap((a) => a.items)
     : presupuesto.items;
 
-  const catalogItems = allItems.filter(
-    (item) => item.producto_imagen || item.producto_descripcion
-  );
+  const seenNames = new Set<string>();
+  const catalogItems = allItems.filter((item) => {
+    if (!(item.producto_imagen || item.producto_descripcion)) return false;
+    if (seenNames.has(item.producto_nombre)) return false;
+    seenNames.add(item.producto_nombre);
+    return true;
+  });
 
   if (catalogItems.length > 0) {
     for (let ci = 0; ci < catalogItems.length; ci++) {
