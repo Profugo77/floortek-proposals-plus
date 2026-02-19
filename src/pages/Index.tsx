@@ -57,6 +57,7 @@ const Index = () => {
     items: Array<{
       producto_nombre: string;
       producto_imagen: string | null;
+      producto_descripcion?: string | null;
       tipo: "material" | "mano_obra";
       precio_unitario: number;
       cantidad: number;
@@ -71,6 +72,7 @@ const Index = () => {
       id: crypto.randomUUID(),
       producto_nombre: item.producto_nombre,
       producto_imagen: item.producto_imagen,
+      producto_descripcion: item.producto_descripcion || null,
       tipo: item.tipo,
       precio_unitario: item.precio_unitario,
       cantidad: item.cantidad,

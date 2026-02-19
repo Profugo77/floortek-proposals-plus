@@ -82,37 +82,70 @@ async function buscarEnBaseDeDatos(productName: string): Promise<{ precio: numbe
   return null;
 }
 
-async function buscarPrecioTiendaPisos(productName: string): Promise<{ precio: number; imagen: string | null; nombre_exacto: string } | null> {
+async function buscarEnTiendaPisos(productName: string): Promise<{ imagen: string | null; descripcion: string | null } | null> {
   try {
-    const searchUrl = `https://tiendapisos.com/?s=${encodeURIComponent(productName)}&post_type=product`;
-    const res = await fetch(searchUrl, {
+    // Build product URL slug from name: "Roble Fox SP001 5 mm con manta" -> "roble-fox-sp001-5-mm-con-manta"
+    const slug = productName
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove accents
+      .replace(/[^a-z0-9\s-]/g, '') // remove special chars
+      .trim()
+      .replace(/\s+/g, '-'); // spaces to hyphens
+
+    const productUrl = `https://tiendapisos.com/producto/${slug}/`;
+    console.log(`Fetching product page: ${productUrl}`);
+
+    const res = await fetch(productUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Accept': 'text/html',
-        'Accept-Language': 'es-AR,es;q=0.9',
       },
     });
+
+    if (!res.ok) {
+      console.log(`Product page returned ${res.status}`);
+      return null;
+    }
+
     const html = await res.text();
 
-    const productBlocks = html.match(/<li[^>]*class="[^"]*product[^"]*"[^>]*>[\s\S]*?<\/li>/gi) || [];
-    
-    for (const block of productBlocks.slice(0, 1)) {
-      const nameMatch = block.match(/<h2[^>]*>(.*?)<\/h2>/i);
-      const priceMatch = block.match(/<bdi[^>]*>\s*<span[^>]*>\$<\/span>\s*([\d.,]+)\s*<\/bdi>/i)
-        || block.match(/<span class="woocommerce-Price-amount[^"]*"[^>]*>.*?([\d.,]+)<\/span>/i);
-      const imgMatch = block.match(/<img[^>]*src="([^"]+)"[^>]*>/i);
+    // Check if it's a 404 page
+    if (html.includes('No se encontró esa página') || html.includes('error404')) {
+      console.log('Product page is 404');
+      return null;
+    }
 
-      if (nameMatch) {
-        const rawPrice = priceMatch?.[1]?.replace(/\./g, '').replace(',', '.') || '0';
-        return {
-          nombre_exacto: nameMatch[1].replace(/<[^>]*>/g, '').trim(),
-          precio: parseFloat(rawPrice) || 0,
-          imagen: imgMatch?.[1] || null,
-        };
+    // Extract main product image (800x800 jpg, not the logo png)
+    const imgMatch = html.match(/<img[^>]*width="800"[^>]*src="(https:\/\/tiendapisos\.com\/wp-content\/uploads\/[^"]*\.jpg)"/i)
+      || html.match(/<img[^>]*src="(https:\/\/tiendapisos\.com\/wp-content\/uploads\/[^"]*\.jpg)"[^>]*width="800"/i)
+      || html.match(/<img[^>]*src="(https:\/\/tiendapisos\.com\/wp-content\/uploads\/\d{4}\/\d{2}\/[^"]*\.jpg)"/i);
+
+    // Extract short description (the h2 subtitle that describes the product)
+    // Pattern: first h2 is the product name, second h2 is the description
+    const h2Matches = [...html.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/gi)];
+    let descripcion: string | null = null;
+    for (const m of h2Matches) {
+      const text = m[1].replace(/<[^>]*>/g, '').trim();
+      if (text.length > 20 && !text.includes('$') && text !== productName) {
+        descripcion = text.substring(0, 500);
+        break;
       }
     }
+
+    // Also try the "Piso vinílico SPC..." style description
+    if (!descripcion) {
+      const descMatch = html.match(/Piso\s+(?:vin[ií]lico|flotante|SPC|laminado)[^<]{10,500}/i);
+      if (descMatch) {
+        descripcion = descMatch[0].trim();
+      }
+    }
+
+    const imagen = imgMatch?.[1] || null;
+    console.log(`Product page result: img=${!!imagen}, desc=${!!descripcion}`);
+    
+    return { imagen, descripcion };
   } catch (e) {
-    console.error('Error scraping:', e);
+    console.error('Error fetching product page:', e);
   }
   return null;
 }
@@ -211,10 +244,10 @@ Reglas:
     const enrichedItems = await Promise.all(
       (parsed.items || []).map(async (item) => {
         if (item.tipo === 'mano_obra') {
-          // Don't search for labor items
           return {
             producto_nombre: item.nombre,
             producto_imagen: null,
+            producto_descripcion: null,
             tipo: 'mano_obra' as const,
             precio_unitario: 0,
             cantidad: item.cantidad || 1,
@@ -225,10 +258,16 @@ Reglas:
 
         // Priority 1: Check local DB (uploaded CSV prices)
         const dbResult = await buscarEnBaseDeDatos(item.nombre);
+        
+        // Use the exact DB name for tienda page fetch (better match than generic dictated name)
+        const searchName = dbResult?.nombre_exacto || item.nombre;
+        const tiendaResult = await buscarEnTiendaPisos(searchName);
+
         if (dbResult && dbResult.precio > 0) {
           return {
             producto_nombre: dbResult.nombre_exacto,
-            producto_imagen: null,
+            producto_imagen: tiendaResult?.imagen || null,
+            producto_descripcion: tiendaResult?.descripcion || null,
             tipo: 'material' as const,
             precio_unitario: dbResult.precio,
             cantidad: item.cantidad || 1,
@@ -237,24 +276,11 @@ Reglas:
           };
         }
 
-        // Priority 2: Scrape tiendapisos.com
-        const found = await buscarPrecioTiendaPisos(item.nombre);
-        if (found && found.precio > 0) {
-          return {
-            producto_nombre: found.nombre_exacto,
-            producto_imagen: found.imagen,
-            tipo: 'material' as const,
-            precio_unitario: found.precio,
-            cantidad: item.cantidad || 1,
-            descuento: item.descuento || 0,
-            fuente: 'tiendapisos',
-          };
-        }
-
-        // Fallback: manual entry
+        // Fallback: manual entry (no separate tienda price lookup since we fetch the page directly now)
         return {
           producto_nombre: item.nombre,
-          producto_imagen: null,
+          producto_imagen: tiendaResult?.imagen || null,
+          producto_descripcion: tiendaResult?.descripcion || null,
           tipo: item.tipo as 'material' | 'mano_obra',
           precio_unitario: 0,
           cantidad: item.cantidad || 1,

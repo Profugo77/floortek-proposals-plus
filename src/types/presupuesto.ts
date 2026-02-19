@@ -11,6 +11,7 @@ export interface PresupuestoItem {
   id: string;
   producto_nombre: string;
   producto_imagen: string | null;
+  producto_descripcion?: string | null;
   tipo: 'material' | 'mano_obra';
   precio_unitario: number;
   cantidad: number;
