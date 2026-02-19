@@ -100,20 +100,13 @@ function drawHeader(doc: jsPDF, logoData: string | null, presupuesto?: Presupues
   doc.setFillColor(...EMERALD);
   doc.rect(0, 0, pageW, 35, "F");
 
-  // Logo
+  // Logo - larger, no text
   if (logoData) {
-    doc.addImage(logoData, "PNG", 10, 3, 30, 30);
+    doc.addImage(logoData, "PNG", 10, 2, 55, 31);
   }
 
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(22);
-  doc.setFont("helvetica", "bold");
-  doc.text("FloorTek", 45, 18);
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "italic");
-  doc.text("Hacemos de tu casa, tu hogar", 45, 25);
-
   if (presupuesto) {
+    doc.setTextColor(255, 255, 255);
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     const numText = `Presupuesto N° FT-${String(presupuesto.numero || 0).padStart(4, "0")}`;
