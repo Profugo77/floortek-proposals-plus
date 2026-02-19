@@ -98,11 +98,11 @@ function drawHeader(doc: jsPDF, logoData: string | null, presupuesto?: Presupues
   const pageW = doc.internal.pageSize.getWidth();
 
   doc.setFillColor(...EMERALD);
-  doc.rect(0, 0, pageW, 40, "F");
+  doc.rect(0, 0, pageW, 32, "F");
 
-  // Logo - larger, no text
+  // Logo - proportional as per brand reference
   if (logoData) {
-    doc.addImage(logoData, "PNG", 8, 3, 55, 34);
+    doc.addImage(logoData, "PNG", 8, 4, 58, 24);
   }
 
   if (presupuesto) {
@@ -110,10 +110,10 @@ function drawHeader(doc: jsPDF, logoData: string | null, presupuesto?: Presupues
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     const numText = `Presupuesto N° FT-${String(presupuesto.numero || 0).padStart(4, "0")}`;
-    doc.text(numText, pageW - 15, 15, { align: "right" });
+    doc.text(numText, pageW - 15, 13, { align: "right" });
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text(`Fecha: ${new Date(presupuesto.fecha).toLocaleDateString("es-AR")}`, pageW - 15, 22, { align: "right" });
+    doc.text(`Fecha: ${new Date(presupuesto.fecha).toLocaleDateString("es-AR")}`, pageW - 15, 20, { align: "right" });
   }
 }
 
@@ -128,7 +128,7 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
   drawHeader(doc, logoData, presupuesto);
 
   // Client info
-  let y = 45;
+  let y = 37;
   doc.setTextColor(0, 0, 0);
   doc.setFillColor(240, 240, 240);
   doc.rect(10, y - 5, pageW - 20, 22, "F");
