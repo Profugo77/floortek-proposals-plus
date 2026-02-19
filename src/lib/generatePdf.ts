@@ -98,11 +98,11 @@ function drawHeader(doc: jsPDF, logoData: string | null, presupuesto?: Presupues
   const pageW = doc.internal.pageSize.getWidth();
 
   doc.setFillColor(...EMERALD);
-  doc.rect(0, 0, pageW, 32, "F");
+  doc.rect(0, 0, pageW, 48, "F");
 
   // Logo - proportional as per brand reference
   if (logoData) {
-    doc.addImage(logoData, "PNG", 8, 4, 58, 24);
+    doc.addImage(logoData, "PNG", 8, 4, 70, 40);
   }
 
   if (presupuesto) {
