@@ -7,12 +7,9 @@ const fmt = (n: number) => `$${n.toLocaleString("es-AR", { minimumFractionDigits
 
 /** Load an image - supports both base64 data URLs and regular URLs */
 async function loadImageForPdf(url: string): Promise<string | null> {
-  // If already a data URL (base64 from server), use directly
   if (url.startsWith('data:')) {
     return url;
   }
-
-  // For regular URLs, try loading via Image element
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -32,44 +29,93 @@ async function loadImageForPdf(url: string): Promise<string | null> {
     img.src = url;
   });
 }
-export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
-  const doc = new jsPDF();
+
+/** Load logo as base64 once */
+async function loadLogo(): Promise<string | null> {
+  return loadImageForPdf("/logo_floortek_pdf.png");
+}
+
+/** Draw footer on current page */
+function drawFooter(doc: jsPDF) {
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const footerH = 28;
+  const footerY = pageH - footerH;
+
+  // Green bar
+  doc.setFillColor(...EMERALD);
+  doc.rect(0, footerY, pageW, footerH, "F");
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "bold");
+
+  // Munro column
+  const col1X = 15;
+  let y = footerY + 5;
+  doc.text("Munro", col1X, y);
+  doc.setFont("helvetica", "normal");
+  doc.text("Sivori 5180 – Munro – Bs As", col1X, y + 4);
+  doc.text("(11) 4762 1872 / 0497", col1X, y + 8);
+  doc.text("+54 9 11 2239 – 3653", col1X, y + 12);
+  doc.text("info@floortek.com.ar", col1X, y + 16);
+
+  // CABA column
+  const col2X = pageW / 2 + 10;
+  doc.setFont("helvetica", "bold");
+  doc.text("CABA", col2X, y);
+  doc.setFont("helvetica", "normal");
+  doc.text("Av. Cramer 2933 – CABA", col2X, y + 4);
+  doc.text("(11) 4545 3335 – (11) 4543 8306", col2X, y + 8);
+  doc.text("+54 9 11 2239 3653", col2X, y + 12);
+  doc.text("info@floortek.com.ar", col2X, y + 16);
+
+  // Center divider line
+  doc.setDrawColor(255, 255, 255);
+  doc.setLineWidth(0.3);
+  doc.line(pageW / 2, footerY + 3, pageW / 2, pageH - 3);
+}
+
+/** Draw header bar with logo */
+function drawHeader(doc: jsPDF, logoData: string | null, presupuesto?: Presupuesto) {
   const pageW = doc.internal.pageSize.getWidth();
 
-  // Header bar
   doc.setFillColor(...EMERALD);
   doc.rect(0, 0, pageW, 35, "F");
 
-  // Try to load logo
-  try {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject();
-      img.src = "/logo_floortek.jpg";
-    });
-    doc.addImage(img, "JPEG", 10, 5, 25, 25);
-  } catch {
-    // Skip logo if can't load
+  // Logo
+  if (logoData) {
+    doc.addImage(logoData, "PNG", 10, 3, 30, 30);
   }
 
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(22);
   doc.setFont("helvetica", "bold");
-  doc.text("FloorTek", 40, 18);
+  doc.text("FloorTek", 45, 18);
   doc.setFontSize(9);
   doc.setFont("helvetica", "italic");
-  doc.text("Hacemos de tu casa, tu hogar", 40, 25);
+  doc.text("Hacemos de tu casa, tu hogar", 45, 25);
 
-  // Presupuesto number & date
-  doc.setFontSize(11);
-  doc.setFont("helvetica", "bold");
-  const numText = `Presupuesto N° FT-${String(presupuesto.numero || 0).padStart(4, "0")}`;
-  doc.text(numText, pageW - 15, 15, { align: "right" });
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.text(`Fecha: ${new Date(presupuesto.fecha).toLocaleDateString("es-AR")}`, pageW - 15, 22, { align: "right" });
+  if (presupuesto) {
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    const numText = `Presupuesto N° FT-${String(presupuesto.numero || 0).padStart(4, "0")}`;
+    doc.text(numText, pageW - 15, 15, { align: "right" });
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Fecha: ${new Date(presupuesto.fecha).toLocaleDateString("es-AR")}`, pageW - 15, 22, { align: "right" });
+  }
+}
+
+export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
+  const doc = new jsPDF();
+  const pageW = doc.internal.pageSize.getWidth();
+
+  // Pre-load logo
+  const logoData = await loadLogo();
+
+  // Header
+  drawHeader(doc, logoData, presupuesto);
 
   // Client info
   let y = 45;
@@ -164,14 +210,24 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
     currentY += 6 + lines.length * 4 + 8;
   }
 
-  // Product catalog section — only items with image or description from tiendapisos
+  // Terms
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(130, 130, 130);
+  const termsY = doc.internal.pageSize.getHeight() - 38;
+  doc.text("TÉRMINOS Y CONDICIONES:", 10, termsY);
+  doc.text("• Presupuesto válido por 15 días. • Precios sujetos a cambios sin previo aviso.", 10, termsY + 5);
+  doc.text("• Los plazos de entrega se confirman al momento de la compra. • Forma de pago a convenir.", 10, termsY + 9);
+
+  // Footer on first page
+  drawFooter(doc);
+
+  // Product catalog section
   const catalogItems = presupuesto.items.filter(
     (item) => item.producto_imagen || item.producto_descripcion
   );
 
   if (catalogItems.length > 0) {
-    const pageH = doc.internal.pageSize.getHeight();
-
     for (let ci = 0; ci < catalogItems.length; ci++) {
       const item = catalogItems[ci];
       doc.addPage();
@@ -186,7 +242,7 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
 
       let catY = 35;
 
-      // Product name - large
+      // Product name
       doc.setTextColor(...EMERALD);
       doc.setFontSize(18);
       doc.setFont("helvetica", "bold");
@@ -201,7 +257,7 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
       doc.text(`Precio: ${fmt(item.precio_unitario)} / unidad`, 15, catY);
       catY += 12;
 
-      // Large product image (centered, up to 130x130mm)
+      // Large product image
       if (item.producto_imagen) {
         const imgData = await loadImageForPdf(item.producto_imagen);
         if (imgData) {
@@ -212,10 +268,10 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
         }
       }
 
-      // Description box - dark gray background with white text
+      // Description box
       if (item.producto_descripcion) {
         const pageH = doc.internal.pageSize.getHeight();
-        if (catY + 30 > pageH - 30) {
+        if (catY + 30 > pageH - 35) {
           doc.addPage();
           catY = 20;
         }
@@ -226,36 +282,24 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
         const linesToShow = descLines.slice(0, 18);
         const boxH = 14 + linesToShow.length * 4.2;
 
-        // Dark gray rounded box
         doc.setFillColor(50, 50, 50);
         doc.roundedRect(10, catY, pageW - 20, boxH, 3, 3, "F");
 
-        // Title in white
         doc.setFontSize(10);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(255, 255, 255);
         doc.text("Características del producto", 18, catY + 9);
 
-        // Description lines in white
         doc.setFontSize(8.5);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(230, 230, 230);
         doc.text(linesToShow, 18, catY + 16);
       }
+
+      // Footer on each catalog page
+      drawFooter(doc);
     }
   }
-
-  // Footer - Terms (on last page)
-  const footerY = doc.internal.pageSize.getHeight() - 30;
-  doc.setDrawColor(200, 200, 200);
-  doc.line(10, footerY, pageW - 10, footerY);
-  doc.setFontSize(7);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(130, 130, 130);
-  doc.text("TÉRMINOS Y CONDICIONES:", 10, footerY + 5);
-  doc.text("• Presupuesto válido por 15 días. • Precios sujetos a cambios sin previo aviso.", 10, footerY + 10);
-  doc.text("• Los plazos de entrega se confirman al momento de la compra. • Forma de pago a convenir.", 10, footerY + 14);
-  doc.text("FloorTek - Hacemos de tu casa, tu hogar | www.floortek.com.ar", pageW / 2, footerY + 22, { align: "center" });
 
   doc.save(`FloorTek-FT-${String(presupuesto.numero || 0).padStart(4, "0")}.pdf`);
 }
