@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { Presupuesto, calcularSubtotalItem } from "@/types/presupuesto";
+import { Presupuesto, Alternativa, calcularSubtotalItem } from "@/types/presupuesto";
 
 const EMERALD = [0, 121, 107] as const;
 const fmt = (n: number) => `$${n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -59,7 +59,6 @@ function drawFooter(doc: jsPDF) {
   const footerH = 28;
   const footerY = pageH - footerH;
 
-  // Green bar
   doc.setFillColor(...EMERALD);
   doc.rect(0, footerY, pageW, footerH, "F");
 
@@ -67,7 +66,6 @@ function drawFooter(doc: jsPDF) {
   doc.setFontSize(7);
   doc.setFont("helvetica", "bold");
 
-  // Munro column
   const col1X = 15;
   let y = footerY + 5;
   doc.text("Munro", col1X, y);
@@ -77,7 +75,6 @@ function drawFooter(doc: jsPDF) {
   doc.text("+54 9 11 2239 – 3653", col1X, y + 12);
   doc.text("info@floortek.com.ar", col1X, y + 16);
 
-  // CABA column
   const col2X = pageW / 2 + 10;
   doc.setFont("helvetica", "bold");
   doc.text("CABA", col2X, y);
@@ -87,7 +84,6 @@ function drawFooter(doc: jsPDF) {
   doc.text("+54 9 11 2239 3653", col2X, y + 12);
   doc.text("info@floortek.com.ar", col2X, y + 16);
 
-  // Center divider line
   doc.setDrawColor(255, 255, 255);
   doc.setLineWidth(0.3);
   doc.line(pageW / 2, footerY + 3, pageW / 2, pageH - 3);
@@ -117,34 +113,9 @@ function drawHeader(doc: jsPDF, headerData: string | null, presupuesto?: Presupu
   }
 }
 
-export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
-  const doc = new jsPDF();
-  const pageW = doc.internal.pageSize.getWidth();
-
-  // Pre-load header image
-  const headerData = await loadHeaderImage();
-
-  // Header
-  drawHeader(doc, headerData, presupuesto);
-
-  // Client info
-  let y = 37;
-  doc.setTextColor(0, 0, 0);
-  doc.setFillColor(240, 240, 240);
-  doc.rect(10, y - 5, pageW - 20, 22, "F");
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
-  doc.text("DATOS DEL CLIENTE", 15, y + 2);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text(`Cliente: ${presupuesto.cliente_nombre}`, 15, y + 9);
-  doc.text(`Dirección: ${presupuesto.cliente_direccion}`, 95, y + 9);
-  doc.text(`Tel: ${presupuesto.cliente_telefono}`, 15, y + 15);
-
-  y = 72;
-
-  // Items table
-  const tableData = presupuesto.items.map((item) => [
+/** Draw items table and return finalY */
+function drawItemsTable(doc: jsPDF, items: Presupuesto["items"], startY: number): number {
+  const tableData = items.map((item) => [
     item.producto_nombre,
     item.tipo === "material" ? "Material" : "Mano de Obra",
     fmt(item.precio_unitario),
@@ -154,7 +125,7 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
   ]);
 
   autoTable(doc, {
-    startY: y,
+    startY,
     head: [["Producto", "Tipo", "Precio Unit.", "Cant.", "Desc.", "Subtotal"]],
     body: tableData,
     headStyles: {
@@ -175,8 +146,13 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
     margin: { left: 10, right: 10 },
   });
 
-  // Totals section
-  const finalY = (doc as any).lastAutoTable.finalY + 10;
+  return (doc as any).lastAutoTable.finalY;
+}
+
+/** Draw totals block and return finalY */
+function drawTotals(doc: jsPDF, totales: { subtotal_materiales: number; subtotal_mano_obra: number; iva: number; total: number }, startY: number): number {
+  const pageW = doc.internal.pageSize.getWidth();
+  const finalY = startY + 10;
 
   doc.setFillColor(...EMERALD);
   doc.rect(pageW - 90, finalY, 80, 4, "F");
@@ -189,13 +165,13 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
   doc.setFont("helvetica", "normal");
   doc.setTextColor(80, 80, 80);
   doc.text("Subtotal Materiales (neto):", totalsX, tY);
-  doc.text(fmt(presupuesto.subtotal_materiales), valX, tY, { align: "right" });
+  doc.text(fmt(totales.subtotal_materiales), valX, tY, { align: "right" });
   tY += 7;
   doc.text("Subtotal Mano de Obra (neto):", totalsX, tY);
-  doc.text(fmt(presupuesto.subtotal_mano_obra), valX, tY, { align: "right" });
+  doc.text(fmt(totales.subtotal_mano_obra), valX, tY, { align: "right" });
   tY += 7;
   doc.text("IVA (21%):", totalsX, tY);
-  doc.text(fmt(presupuesto.iva), valX, tY, { align: "right" });
+  doc.text(fmt(totales.iva), valX, tY, { align: "right" });
   tY += 3;
   doc.setDrawColor(EMERALD[0], EMERALD[1], EMERALD[2]);
   doc.line(totalsX, tY, valX, tY);
@@ -204,11 +180,81 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...EMERALD);
   doc.text("TOTAL:", totalsX, tY);
-  doc.text(fmt(presupuesto.total), valX, tY, { align: "right" });
+  doc.text(fmt(totales.total), valX, tY, { align: "right" });
+
+  return tY;
+}
+
+export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
+  const doc = new jsPDF();
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+
+  const headerData = await loadHeaderImage();
+
+  drawHeader(doc, headerData, presupuesto);
+
+  // Client info
+  let y = 37;
+  doc.setTextColor(0, 0, 0);
+  doc.setFillColor(240, 240, 240);
+  doc.rect(10, y - 5, pageW - 20, 22, "F");
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text("DATOS DEL CLIENTE", 15, y + 2);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text(`Cliente: ${presupuesto.cliente_nombre}`, 15, y + 9);
+  doc.text(`Dirección: ${presupuesto.cliente_direccion}`, 95, y + 9);
+  doc.text(`Tel: ${presupuesto.cliente_telefono}`, 15, y + 15);
+
+  y = 72;
+
+  const hasAlternativas = presupuesto.alternativas && presupuesto.alternativas.length > 0;
+
+  if (hasAlternativas) {
+    // Render each alternativa as a separate section
+    for (let ai = 0; ai < presupuesto.alternativas!.length; ai++) {
+      const alt = presupuesto.alternativas![ai];
+
+      // Check if we need a new page
+      if (ai > 0) {
+        doc.addPage();
+        drawHeader(doc, headerData, presupuesto);
+        y = 37;
+      }
+
+      // Alternativa title
+      doc.setFillColor(EMERALD[0], EMERALD[1], EMERALD[2]);
+      doc.rect(10, y, pageW - 20, 8, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.text(alt.nombre.toUpperCase(), 15, y + 6);
+      y += 12;
+
+      // Items table
+      const tableEndY = drawItemsTable(doc, alt.items, y);
+
+      // Totals for this alternativa
+      const totalsEndY = drawTotals(doc, alt, tableEndY);
+      y = totalsEndY + 15;
+    }
+  } else {
+    // Single items list (no alternativas)
+    const tableEndY = drawItemsTable(doc, presupuesto.items, y);
+    const totalsEndY = drawTotals(doc, presupuesto, tableEndY);
+    y = totalsEndY;
+  }
 
   // Comments section
-  let currentY = tY + 12;
+  let currentY = y + 12;
   if (presupuesto.comentarios) {
+    // Check page space
+    if (currentY + 20 > pageH - 38) {
+      doc.addPage();
+      currentY = 20;
+    }
     doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(80, 80, 80);
@@ -224,16 +270,24 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
   doc.setFontSize(7);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(130, 130, 130);
-  const termsY = doc.internal.pageSize.getHeight() - 38;
+  const termsY = pageH - 38;
   doc.text("TÉRMINOS Y CONDICIONES:", 10, termsY);
   doc.text("• Presupuesto válido por 15 días. • Precios sujetos a cambios sin previo aviso.", 10, termsY + 5);
   doc.text("• Los plazos de entrega se confirman al momento de la compra. • Forma de pago a convenir.", 10, termsY + 9);
 
-  // Footer on first page
-  drawFooter(doc);
+  // Footer on all pages
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    drawFooter(doc);
+  }
 
-  // Product catalog section
-  const catalogItems = presupuesto.items.filter(
+  // Product catalog section (collect all items from alternativas or main)
+  const allItems = hasAlternativas
+    ? presupuesto.alternativas!.flatMap((a) => a.items)
+    : presupuesto.items;
+
+  const catalogItems = allItems.filter(
     (item) => item.producto_imagen || item.producto_descripcion
   );
 
@@ -242,7 +296,6 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
       const item = catalogItems[ci];
       doc.addPage();
 
-      // Header bar
       doc.setFillColor(...EMERALD);
       doc.rect(0, 0, pageW, 25, "F");
       doc.setTextColor(255, 255, 255);
@@ -252,7 +305,6 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
 
       let catY = 35;
 
-      // Product name
       doc.setTextColor(...EMERALD);
       doc.setFontSize(18);
       doc.setFont("helvetica", "bold");
@@ -260,14 +312,12 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
       doc.text(nameLines, 15, catY + 8);
       catY += 8 + nameLines.length * 8 + 5;
 
-      // Price
       doc.setTextColor(60, 60, 60);
       doc.setFontSize(14);
       doc.setFont("helvetica", "bold");
       doc.text(`Precio: ${fmt(item.precio_unitario)} / unidad`, 15, catY);
       catY += 12;
 
-      // Large product image
       if (item.producto_imagen) {
         const imgData = await loadImageForPdf(item.producto_imagen);
         if (imgData) {
@@ -278,9 +328,7 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
         }
       }
 
-      // Description box
       if (item.producto_descripcion) {
-        const pageH = doc.internal.pageSize.getHeight();
         if (catY + 30 > pageH - 35) {
           doc.addPage();
           catY = 20;
@@ -306,7 +354,6 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
         doc.text(linesToShow, 18, catY + 16);
       }
 
-      // Footer on each catalog page
       drawFooter(doc);
     }
   }
