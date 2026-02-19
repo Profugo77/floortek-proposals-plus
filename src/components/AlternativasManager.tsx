@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,7 @@ import TotalesPanel from "@/components/TotalesPanel";
 
 interface Props {
   alternativas: Alternativa[];
-  onChange: (alternativas: Alternativa[]) => void;
+  onChange: React.Dispatch<React.SetStateAction<Alternativa[]>>;
 }
 
 const AlternativasManager = ({ alternativas, onChange }: Props) => {
@@ -35,51 +35,60 @@ const AlternativasManager = ({ alternativas, onChange }: Props) => {
       iva: 0,
       total: 0,
     };
-    onChange([...alternativas, newAlt]);
+    onChange((prev) => [...prev, newAlt]);
     setActiveTab(newAlt.id);
-  }, [alternativas, onChange]);
+  }, [alternativas.length, onChange]);
 
   const removeAlternativa = useCallback((id: string) => {
-    if (alternativas.length <= 1) {
-      toast.error("Debe haber al menos una alternativa");
-      return;
-    }
-    const updated = alternativas.filter((a) => a.id !== id);
-    onChange(updated);
-    if (activeTab === id) setActiveTab(updated[0]?.id || "");
-  }, [alternativas, onChange, activeTab]);
+    onChange((prev) => {
+      if (prev.length <= 1) {
+        toast.error("Debe haber al menos una alternativa");
+        return prev;
+      }
+      const updated = prev.filter((a) => a.id !== id);
+      return updated;
+    });
+    setActiveTab((prevTab) => {
+      if (prevTab === id) {
+        const remaining = alternativas.filter((a) => a.id !== id);
+        return remaining[0]?.id || "";
+      }
+      return prevTab;
+    });
+  }, [alternativas, onChange]);
 
   const duplicateAlternativa = useCallback((id: string) => {
-    const source = alternativas.find((a) => a.id === id);
-    if (!source) return;
-    const newAlt: Alternativa = {
-      ...source,
-      id: crypto.randomUUID(),
-      nombre: `${source.nombre} (copia)`,
-      orden: alternativas.length,
-      items: source.items.map((item) => ({ ...item, id: crypto.randomUUID() })),
-    };
-    onChange([...alternativas, newAlt]);
-    setActiveTab(newAlt.id);
-  }, [alternativas, onChange]);
+    onChange((prev) => {
+      const source = prev.find((a) => a.id === id);
+      if (!source) return prev;
+      const newAlt: Alternativa = {
+        ...source,
+        id: crypto.randomUUID(),
+        nombre: `${source.nombre} (copia)`,
+        orden: prev.length,
+        items: source.items.map((item) => ({ ...item, id: crypto.randomUUID() })),
+      };
+      setActiveTab(newAlt.id);
+      return [...prev, newAlt];
+    });
+  }, [onChange]);
 
   const renameAlternativa = useCallback((id: string, nombre: string) => {
-    onChange(alternativas.map((a) => (a.id === id ? { ...a, nombre } : a)));
-  }, [alternativas, onChange]);
+    onChange((prev) => prev.map((a) => (a.id === id ? { ...a, nombre } : a)));
+  }, [onChange]);
 
-  const updateAltItems = useCallback((altId: string, newItems: PresupuestoItem[]) => {
-    onChange(
-      alternativas.map((a) => {
+  const updateAltItems = useCallback((altId: string, getNewItems: (currentItems: PresupuestoItem[]) => PresupuestoItem[]) => {
+    onChange((prev) =>
+      prev.map((a) => {
         if (a.id !== altId) return a;
+        const newItems = getNewItems(a.items);
         const totales = calcularTotales(newItems);
         return { ...a, items: newItems, ...totales };
       })
     );
-  }, [alternativas, onChange]);
+  }, [onChange]);
 
   const addProductoToAlt = useCallback((altId: string, producto: Producto) => {
-    const alt = alternativas.find((a) => a.id === altId);
-    if (!alt) return;
     const itemId = crypto.randomUUID();
     const newItem: PresupuestoItem = {
       id: itemId,
@@ -91,26 +100,22 @@ const AlternativasManager = ({ alternativas, onChange }: Props) => {
       descuento: 0,
       subtotal: producto.precio,
     };
-    updateAltItems(altId, [...alt.items, newItem]);
+    updateAltItems(altId, (items) => [...items, newItem]);
 
     supabase.functions.invoke("enriquecer-producto", {
       body: { nombre: producto.nombre },
     }).then(({ data }) => {
       if (data?.imagen || data?.descripcion) {
-        onChange(
-          alternativas.map((a) => {
-            if (a.id !== altId) return a;
-            const updatedItems = a.items.map((item) =>
-              item.id === itemId
-                ? { ...item, producto_imagen: data.imagen || item.producto_imagen, producto_descripcion: data.descripcion || item.producto_descripcion }
-                : item
-            );
-            return { ...a, items: updatedItems };
-          })
+        updateAltItems(altId, (items) =>
+          items.map((item) =>
+            item.id === itemId
+              ? { ...item, producto_imagen: data.imagen || item.producto_imagen, producto_descripcion: data.descripcion || item.producto_descripcion }
+              : item
+          )
         );
       }
     }).catch(() => {});
-  }, [alternativas, onChange, updateAltItems]);
+  }, [updateAltItems]);
 
   const addManualItemToAlt = useCallback((altId: string) => {
     if (!manualNombre || !manualPrecio) {
@@ -122,8 +127,6 @@ const AlternativasManager = ({ alternativas, onChange }: Props) => {
       toast.error("El precio debe ser un número válido");
       return;
     }
-    const alt = alternativas.find((a) => a.id === altId);
-    if (!alt) return;
     const itemId = crypto.randomUUID();
     const newItem: PresupuestoItem = {
       id: itemId,
@@ -135,47 +138,42 @@ const AlternativasManager = ({ alternativas, onChange }: Props) => {
       descuento: 0,
       subtotal: precio,
     };
-    updateAltItems(altId, [...alt.items, newItem]);
+    updateAltItems(altId, (items) => [...items, newItem]);
     const nombreToEnrich = manualNombre;
+    const tipoToEnrich = manualTipo;
     setManualNombre("");
     setManualPrecio("");
 
-    if (manualTipo === "material") {
+    if (tipoToEnrich === "material") {
       supabase.functions.invoke("enriquecer-producto", {
         body: { nombre: nombreToEnrich },
       }).then(({ data }) => {
         if (data?.imagen || data?.descripcion) {
-          onChange(
-            alternativas.map((a) => {
-              if (a.id !== altId) return a;
-              const updatedItems = a.items.map((item) =>
-                item.id === itemId
-                  ? { ...item, producto_imagen: data.imagen || item.producto_imagen, producto_descripcion: data.descripcion || item.producto_descripcion }
-                  : item
-              );
-              return { ...a, items: updatedItems };
-            })
+          updateAltItems(altId, (items) =>
+            items.map((item) =>
+              item.id === itemId
+                ? { ...item, producto_imagen: data.imagen || item.producto_imagen, producto_descripcion: data.descripcion || item.producto_descripcion }
+                : item
+            )
           );
         }
       }).catch(() => {});
     }
-  }, [alternativas, onChange, updateAltItems, manualNombre, manualPrecio, manualTipo]);
+  }, [updateAltItems, manualNombre, manualPrecio, manualTipo]);
 
   const updateItemInAlt = useCallback((altId: string, index: number, field: string, value: string | number) => {
-    const alt = alternativas.find((a) => a.id === altId);
-    if (!alt) return;
-    const updated = [...alt.items];
-    const item = { ...updated[index], [field]: value };
-    item.subtotal = calcularSubtotalItem(item);
-    updated[index] = item;
-    updateAltItems(altId, updated);
-  }, [alternativas, updateAltItems]);
+    updateAltItems(altId, (items) => {
+      const updated = [...items];
+      const item = { ...updated[index], [field]: value };
+      item.subtotal = calcularSubtotalItem(item);
+      updated[index] = item;
+      return updated;
+    });
+  }, [updateAltItems]);
 
   const removeItemFromAlt = useCallback((altId: string, index: number) => {
-    const alt = alternativas.find((a) => a.id === altId);
-    if (!alt) return;
-    updateAltItems(altId, alt.items.filter((_, i) => i !== index));
-  }, [alternativas, updateAltItems]);
+    updateAltItems(altId, (items) => items.filter((_, i) => i !== index));
+  }, [updateAltItems]);
 
   return (
     <Card>
@@ -202,7 +200,7 @@ const AlternativasManager = ({ alternativas, onChange }: Props) => {
 
           {alternativas.map((alt) => (
             <TabsContent key={alt.id} value={alt.id} className="space-y-4 mt-4">
-              {/* Alt header: rename, duplicate, delete */}
+              {/* Alt header */}
               <div className="flex gap-2 items-center flex-wrap">
                 <Input
                   value={alt.nombre}
@@ -257,7 +255,7 @@ const AlternativasManager = ({ alternativas, onChange }: Props) => {
                 onRemove={(i) => removeItemFromAlt(alt.id, i)}
               />
 
-              {/* Totals for this alternativa */}
+              {/* Totals */}
               <TotalesPanel
                 subtotalMateriales={alt.subtotal_materiales}
                 subtotalManoObra={alt.subtotal_mano_obra}
