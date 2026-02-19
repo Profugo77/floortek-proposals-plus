@@ -26,15 +26,55 @@ async function buscarEnBaseDeDatos(productName: string): Promise<{ precio: numbe
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const sb = createClient(supabaseUrl, supabaseKey);
 
-    // Search with ilike for fuzzy match
-    const { data } = await sb
+    // Extract meaningful keywords (skip generic words)
+    const stopWords = ['piso', 'pisos', 'metro', 'metros', 'm2', 'de', 'con', 'para', 'el', 'la', 'los', 'las', 'un', 'una', 'del', 'al', 'en', 'por', 'tipo', 'color', 'modelo'];
+    const keywords = productName
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(w => w.length > 1 && !stopWords.includes(w));
+
+    if (keywords.length === 0) return null;
+
+    // Try exact ilike first
+    const { data: exactData } = await sb
       .from('productos')
       .select('nombre, precio')
       .ilike('nombre', `%${productName}%`)
       .limit(1);
 
-    if (data && data.length > 0 && data[0].precio > 0) {
-      return { nombre_exacto: data[0].nombre, precio: data[0].precio };
+    if (exactData && exactData.length > 0 && exactData[0].precio > 0) {
+      return { nombre_exacto: exactData[0].nombre, precio: exactData[0].precio };
+    }
+
+    // Fetch all products and score them by keyword matches
+    const { data: allProducts } = await sb
+      .from('productos')
+      .select('nombre, precio')
+      .gt('precio', 0);
+
+    if (!allProducts || allProducts.length === 0) return null;
+
+    let bestMatch: { nombre: string; precio: number } | null = null;
+    let bestScore = 0;
+
+    for (const prod of allProducts) {
+      const nombreLower = prod.nombre.toLowerCase();
+      let score = 0;
+      for (const kw of keywords) {
+        if (nombreLower.includes(kw)) {
+          score += kw.length; // longer keyword matches are worth more
+        }
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = prod;
+      }
+    }
+
+    // Require at least one meaningful keyword match
+    if (bestMatch && bestScore >= 3) {
+      console.log(`DB match: "${productName}" -> "${bestMatch.nombre}" (score: ${bestScore})`);
+      return { nombre_exacto: bestMatch.nombre, precio: bestMatch.precio };
     }
   } catch (e) {
     console.error('Error buscando en DB:', e);
