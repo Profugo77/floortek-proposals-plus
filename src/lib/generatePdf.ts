@@ -102,7 +102,7 @@ function drawHeader(doc: jsPDF, logoData: string | null, presupuesto?: Presupues
 
   // Logo - proportional as per brand reference
   if (logoData) {
-    doc.addImage(logoData, "PNG", 8, 4, 58, 24);
+    doc.addImage(logoData, "PNG", 8, 3, 40, 26);
   }
 
   if (presupuesto) {
