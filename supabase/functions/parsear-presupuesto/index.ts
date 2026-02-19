@@ -139,23 +139,76 @@ async function buscarEnTiendaPisos(productName: string): Promise<{ imagen: strin
       || html.match(/<img[^>]*src="(https:\/\/tiendapisos\.com\/wp-content\/uploads\/[^"]*\.jpg)"[^>]*width="800"/i)
       || html.match(/<img[^>]*src="(https:\/\/tiendapisos\.com\/wp-content\/uploads\/\d{4}\/\d{2}\/[^"]*\.jpg)"/i);
 
-    // Extract description
+    // Extract product characteristics from the page
+    const characteristics: string[] = [];
+
+    // Look for table rows with product specs (common WooCommerce pattern)
+    const tableRows = [...html.matchAll(/<tr[^>]*>\s*<t[hd][^>]*>([\s\S]*?)<\/t[hd]>\s*<t[hd][^>]*>([\s\S]*?)<\/t[hd]>\s*<\/tr>/gi)];
+    for (const row of tableRows) {
+      const label = row[1].replace(/<[^>]*>/g, '').trim();
+      const value = row[2].replace(/<[^>]*>/g, '').trim();
+      if (label && value && label.length < 60 && value.length < 200) {
+        characteristics.push(`${label}: ${value}`);
+      }
+    }
+
+    // Look for list items with specs
+    const liMatches = [...html.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)];
+    for (const li of liMatches) {
+      const text = li[1].replace(/<[^>]*>/g, '').trim();
+      if (text.length > 5 && text.length < 200 && !text.includes('$') && !text.includes('Agregar') && !text.includes('carrito')) {
+        // Only add if it looks like a spec (contains colon or descriptive keywords)
+        if (text.includes(':') || /(?:mm|cm|m2|kg|espesor|ancho|largo|capa|clase|resist|garant|click|formato|dimens)/i.test(text)) {
+          if (!characteristics.some(c => c === text)) {
+            characteristics.push(text);
+          }
+        }
+      }
+    }
+
+    // Extract h2 description as fallback intro
     const h2Matches = [...html.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/gi)];
-    let descripcion: string | null = null;
+    let introDesc: string | null = null;
     for (const m of h2Matches) {
       const text = m[1].replace(/<[^>]*>/g, '').trim();
       if (text.length > 20 && !text.includes('$') && text !== productName) {
-        descripcion = text.substring(0, 500);
+        introDesc = text.substring(0, 300);
         break;
       }
     }
 
-    if (!descripcion) {
-      const descMatch = html.match(/Piso\s+(?:vin[ií]lico|flotante|SPC|laminado)[^<]{10,500}/i);
+    if (!introDesc) {
+      const descMatch = html.match(/Piso\s+(?:vin[ií]lico|flotante|SPC|laminado)[^<]{10,300}/i);
       if (descMatch) {
-        descripcion = descMatch[0].trim();
+        introDesc = descMatch[0].trim();
       }
     }
+
+    // Also extract from <div class="woocommerce-product-details__short-description"> or similar
+    const shortDescMatch = html.match(/class="[^"]*short[_-]?description[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+    if (shortDescMatch) {
+      const shortText = shortDescMatch[1].replace(/<[^>]*>/g, '').trim();
+      if (shortText.length > 10 && !characteristics.some(c => c.includes(shortText.substring(0, 20)))) {
+        if (introDesc && !introDesc.includes(shortText.substring(0, 20))) {
+          introDesc = introDesc + '\n' + shortText;
+        } else if (!introDesc) {
+          introDesc = shortText;
+        }
+      }
+    }
+
+    // Build full description
+    let descripcion: string | null = null;
+    const parts: string[] = [];
+    if (introDesc) parts.push(introDesc);
+    if (characteristics.length > 0) {
+      parts.push('\nCaracterísticas:\n• ' + characteristics.slice(0, 15).join('\n• '));
+    }
+    if (parts.length > 0) {
+      descripcion = parts.join('\n').substring(0, 1000);
+    }
+
+    console.log(`Description built: ${descripcion ? descripcion.length + ' chars, ' + characteristics.length + ' specs' : 'none'}`);
 
     const imgUrl = imgMatch?.[1] || null;
     

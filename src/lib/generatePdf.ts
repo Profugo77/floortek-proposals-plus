@@ -212,35 +212,35 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
         }
       }
 
-      // Description
+      // Description box - dark gray background with white text
       if (item.producto_descripcion) {
+        const pageH = doc.internal.pageSize.getHeight();
         if (catY + 30 > pageH - 30) {
           doc.addPage();
           catY = 20;
         }
-        doc.setFillColor(245, 245, 245);
-        const descBoxY = catY;
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(...EMERALD);
-        doc.text("Descripción del producto:", 15, catY + 8);
+
         doc.setFontSize(9);
         doc.setFont("helvetica", "normal");
-        doc.setTextColor(80, 80, 80);
-        const descLines = doc.splitTextToSize(item.producto_descripcion, pageW - 30);
-        const linesToShow = descLines.slice(0, 12);
-        doc.text(linesToShow, 15, catY + 16);
-        const boxH = 20 + linesToShow.length * 4.5;
-        doc.roundedRect(10, descBoxY - 2, pageW - 20, boxH, 2, 2, "F");
-        // Re-draw text on top of background
+        const descLines = doc.splitTextToSize(item.producto_descripcion, pageW - 40);
+        const linesToShow = descLines.slice(0, 18);
+        const boxH = 14 + linesToShow.length * 4.2;
+
+        // Dark gray rounded box
+        doc.setFillColor(50, 50, 50);
+        doc.roundedRect(10, catY, pageW - 20, boxH, 3, 3, "F");
+
+        // Title in white
         doc.setFontSize(10);
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(...EMERALD);
-        doc.text("Descripción del producto:", 15, catY + 8);
-        doc.setFontSize(9);
+        doc.setTextColor(255, 255, 255);
+        doc.text("Características del producto", 18, catY + 9);
+
+        // Description lines in white
+        doc.setFontSize(8.5);
         doc.setFont("helvetica", "normal");
-        doc.setTextColor(80, 80, 80);
-        doc.text(linesToShow, 15, catY + 16);
+        doc.setTextColor(230, 230, 230);
+        doc.text(linesToShow, 18, catY + 16);
       }
     }
   }
