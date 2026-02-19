@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Historial from "./pages/Historial";
 import Productos from "./pages/Productos";
 import NotFound from "./pages/NotFound";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -17,9 +18,9 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/historial" element={<Historial />} />
-          <Route path="/productos" element={<Productos />} />
+          <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+          <Route path="/historial" element={<ProtectedRoute><Historial /></ProtectedRoute>} />
+          <Route path="/productos" element={<ProtectedRoute><Productos /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
