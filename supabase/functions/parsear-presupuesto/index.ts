@@ -1,3 +1,5 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
@@ -18,6 +20,28 @@ interface ParsedPresupuesto {
   items: ParsedItem[];
 }
 
+async function buscarEnBaseDeDatos(productName: string): Promise<{ precio: number; nombre_exacto: string } | null> {
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const sb = createClient(supabaseUrl, supabaseKey);
+
+    // Search with ilike for fuzzy match
+    const { data } = await sb
+      .from('productos')
+      .select('nombre, precio')
+      .ilike('nombre', `%${productName}%`)
+      .limit(1);
+
+    if (data && data.length > 0 && data[0].precio > 0) {
+      return { nombre_exacto: data[0].nombre, precio: data[0].precio };
+    }
+  } catch (e) {
+    console.error('Error buscando en DB:', e);
+  }
+  return null;
+}
+
 async function buscarPrecioTiendaPisos(productName: string): Promise<{ precio: number; imagen: string | null; nombre_exacto: string } | null> {
   try {
     const searchUrl = `https://tiendapisos.com/?s=${encodeURIComponent(productName)}&post_type=product`;
@@ -30,7 +54,6 @@ async function buscarPrecioTiendaPisos(productName: string): Promise<{ precio: n
     });
     const html = await res.text();
 
-    // Extract first product from WooCommerce results
     const productBlocks = html.match(/<li[^>]*class="[^"]*product[^"]*"[^>]*>[\s\S]*?<\/li>/gi) || [];
     
     for (const block of productBlocks.slice(0, 1)) {
@@ -160,6 +183,21 @@ Reglas:
           };
         }
 
+        // Priority 1: Check local DB (uploaded CSV prices)
+        const dbResult = await buscarEnBaseDeDatos(item.nombre);
+        if (dbResult && dbResult.precio > 0) {
+          return {
+            producto_nombre: dbResult.nombre_exacto,
+            producto_imagen: null,
+            tipo: 'material' as const,
+            precio_unitario: dbResult.precio,
+            cantidad: item.cantidad || 1,
+            descuento: item.descuento || 0,
+            fuente: 'base_datos',
+          };
+        }
+
+        // Priority 2: Scrape tiendapisos.com
         const found = await buscarPrecioTiendaPisos(item.nombre);
         if (found && found.precio > 0) {
           return {
@@ -173,6 +211,7 @@ Reglas:
           };
         }
 
+        // Fallback: manual entry
         return {
           producto_nombre: item.nombre,
           producto_imagen: null,
