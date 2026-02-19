@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { generatePresupuestoPdf } from "@/lib/generatePdf";
+import { PresupuestoItem, Alternativa, calcularTotales } from "@/types/presupuesto";
 import { toast } from "sonner";
-import { Search, FileDown, History } from "lucide-react";
+import { Search, FileDown, History, Pencil } from "lucide-react";
 
 interface PresupuestoRow {
   id: string;
@@ -15,6 +17,7 @@ interface PresupuestoRow {
   cliente_direccion: string;
   cliente_telefono: string;
   fecha: string;
+  comentarios: string;
   subtotal_materiales: number;
   subtotal_mano_obra: number;
   iva: number;
@@ -25,6 +28,7 @@ interface PresupuestoRow {
 const fmt = (n: number) => `$${n.toLocaleString("es-AR", { minimumFractionDigits: 2 })}`;
 
 const Historial = () => {
+  const navigate = useNavigate();
   const [presupuestos, setPresupuestos] = useState<PresupuestoRow[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -45,29 +49,84 @@ const Historial = () => {
     setLoading(false);
   };
 
-  const regenerarPdf = async (p: PresupuestoRow) => {
-    const { data: items } = await supabase
+  const loadFullPresupuesto = async (p: PresupuestoRow) => {
+    // Load alternativas
+    const { data: altsData } = await supabase
+      .from("presupuesto_alternativas")
+      .select("*")
+      .eq("presupuesto_id", p.id)
+      .order("orden");
+
+    // Load all items
+    const { data: itemsData } = await supabase
       .from("presupuesto_items")
       .select("*")
       .eq("presupuesto_id", p.id);
 
-    if (!items) {
+    if (!itemsData) {
       toast.error("No se pudieron cargar los ítems");
-      return;
+      return null;
     }
+
+    const mapItem = (i: any): PresupuestoItem => ({
+      id: i.id,
+      producto_nombre: i.producto_nombre,
+      producto_imagen: i.producto_imagen,
+      tipo: i.tipo as "material" | "mano_obra",
+      precio_unitario: i.precio_unitario,
+      cantidad: i.cantidad,
+      descuento: i.descuento,
+      subtotal: i.subtotal,
+    });
+
+    if (altsData && altsData.length > 0) {
+      const alternativas: Alternativa[] = altsData.map((alt) => {
+        const altItems = itemsData
+          .filter((i) => i.alternativa_id === alt.id)
+          .map(mapItem);
+        const totales = calcularTotales(altItems);
+        return {
+          id: alt.id,
+          nombre: alt.nombre,
+          orden: alt.orden,
+          items: altItems,
+          ...totales,
+        };
+      });
+      return { items: [], alternativas };
+    } else {
+      return { items: itemsData.map(mapItem), alternativas: [] };
+    }
+  };
+
+  const editarPresupuesto = async (p: PresupuestoRow) => {
+    const result = await loadFullPresupuesto(p);
+    if (!result) return;
+
+    navigate("/", {
+      state: {
+        editPresupuesto: {
+          id: p.id,
+          numero: p.numero,
+          cliente_nombre: p.cliente_nombre,
+          cliente_direccion: p.cliente_direccion,
+          cliente_telefono: p.cliente_telefono,
+          comentarios: p.comentarios,
+          fecha: p.fecha,
+          ...result,
+        },
+      },
+    });
+  };
+
+  const regenerarPdf = async (p: PresupuestoRow) => {
+    const result = await loadFullPresupuesto(p);
+    if (!result) return;
 
     await generatePresupuestoPdf({
       ...p,
-      items: items.map((i) => ({
-        id: i.id,
-        producto_nombre: i.producto_nombre,
-        producto_imagen: i.producto_imagen,
-        tipo: i.tipo as "material" | "mano_obra",
-        precio_unitario: i.precio_unitario,
-        cantidad: i.cantidad,
-        descuento: i.descuento,
-        subtotal: i.subtotal,
-      })),
+      items: result.items,
+      alternativas: result.alternativas.length > 0 ? result.alternativas : undefined,
     });
 
     toast.success("PDF regenerado");
@@ -116,7 +175,7 @@ const Historial = () => {
                       <th className="px-3 py-2 text-left">Fecha</th>
                       <th className="px-3 py-2 text-left">Cliente</th>
                       <th className="px-3 py-2 text-right">Total</th>
-                      <th className="px-3 py-2 text-center rounded-tr-md">PDF</th>
+                      <th className="px-3 py-2 text-center rounded-tr-md">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -131,15 +190,26 @@ const Historial = () => {
                         <td className="px-3 py-3">{p.cliente_nombre}</td>
                         <td className="px-3 py-3 text-right font-semibold">{fmt(p.total)}</td>
                         <td className="px-3 py-3 text-center">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => regenerarPdf(p)}
-                            className="gap-1 text-primary"
-                          >
-                            <FileDown className="h-4 w-4" />
-                            PDF
-                          </Button>
+                          <div className="flex items-center justify-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => editarPresupuesto(p)}
+                              className="gap-1 text-primary"
+                            >
+                              <Pencil className="h-4 w-4" />
+                              Editar
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => regenerarPdf(p)}
+                              className="gap-1 text-primary"
+                            >
+                              <FileDown className="h-4 w-4" />
+                              PDF
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}

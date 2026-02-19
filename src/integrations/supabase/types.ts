@@ -14,8 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      presupuesto_alternativas: {
+        Row: {
+          created_at: string
+          id: string
+          iva: number
+          nombre: string
+          orden: number
+          presupuesto_id: string
+          subtotal_mano_obra: number
+          subtotal_materiales: number
+          total: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          iva?: number
+          nombre?: string
+          orden?: number
+          presupuesto_id: string
+          subtotal_mano_obra?: number
+          subtotal_materiales?: number
+          total?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          iva?: number
+          nombre?: string
+          orden?: number
+          presupuesto_id?: string
+          subtotal_mano_obra?: number
+          subtotal_materiales?: number
+          total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "presupuesto_alternativas_presupuesto_id_fkey"
+            columns: ["presupuesto_id"]
+            isOneToOne: false
+            referencedRelation: "presupuestos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       presupuesto_items: {
         Row: {
+          alternativa_id: string | null
           cantidad: number
           created_at: string
           descuento: number
@@ -28,6 +73,7 @@ export type Database = {
           tipo: string
         }
         Insert: {
+          alternativa_id?: string | null
           cantidad?: number
           created_at?: string
           descuento?: number
@@ -40,6 +86,7 @@ export type Database = {
           tipo?: string
         }
         Update: {
+          alternativa_id?: string | null
           cantidad?: number
           created_at?: string
           descuento?: number
@@ -52,6 +99,13 @@ export type Database = {
           tipo?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "presupuesto_items_alternativa_id_fkey"
+            columns: ["alternativa_id"]
+            isOneToOne: false
+            referencedRelation: "presupuesto_alternativas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "presupuesto_items_presupuesto_id_fkey"
             columns: ["presupuesto_id"]

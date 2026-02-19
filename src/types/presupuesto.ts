@@ -19,6 +19,17 @@ export interface PresupuestoItem {
   subtotal: number;
 }
 
+export interface Alternativa {
+  id: string;
+  nombre: string;
+  orden: number;
+  items: PresupuestoItem[];
+  subtotal_materiales: number;
+  subtotal_mano_obra: number;
+  iva: number;
+  total: number;
+}
+
 export interface Presupuesto {
   id?: string;
   numero?: number;
@@ -27,6 +38,7 @@ export interface Presupuesto {
   cliente_telefono: string;
   fecha: string;
   items: PresupuestoItem[];
+  alternativas?: Alternativa[];
   comentarios?: string;
   subtotal_materiales: number;
   subtotal_mano_obra: number;
