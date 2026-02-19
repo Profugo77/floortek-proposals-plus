@@ -66,6 +66,7 @@ export type Database = {
           cliente_direccion: string
           cliente_nombre: string
           cliente_telefono: string
+          comentarios: string
           created_at: string
           fecha: string
           id: string
@@ -79,6 +80,7 @@ export type Database = {
           cliente_direccion?: string
           cliente_nombre?: string
           cliente_telefono?: string
+          comentarios?: string
           created_at?: string
           fecha?: string
           id?: string
@@ -92,6 +94,7 @@ export type Database = {
           cliente_direccion?: string
           cliente_nombre?: string
           cliente_telefono?: string
+          comentarios?: string
           created_at?: string
           fecha?: string
           id?: string
