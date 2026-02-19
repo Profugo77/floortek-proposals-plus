@@ -1,4 +1,8 @@
 import { Link, useLocation } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { LogOut } from "lucide-react";
+import { toast } from "sonner";
 
 const Header = () => {
   const location = useLocation();
@@ -48,6 +52,18 @@ const Header = () => {
           >
             Productos
           </Link>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-primary-foreground hover:bg-primary-foreground/10 gap-1"
+            onClick={async () => {
+              await supabase.auth.signOut();
+              toast.info("Sesión cerrada");
+            }}
+          >
+            <LogOut className="h-4 w-4" />
+            Salir
+          </Button>
         </nav>
       </div>
     </header>
