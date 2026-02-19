@@ -124,19 +124,97 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
   doc.text(fmt(presupuesto.total), valX, tY, { align: "right" });
 
   // Comments section
+  let currentY = tY + 12;
   if (presupuesto.comentarios) {
-    const commY = tY + 12;
     doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(80, 80, 80);
-    doc.text("COMENTARIOS:", 10, commY);
+    doc.text("COMENTARIOS:", 10, currentY);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     const lines = doc.splitTextToSize(presupuesto.comentarios, pageW - 20);
-    doc.text(lines, 10, commY + 6);
+    doc.text(lines, 10, currentY + 6);
+    currentY += 6 + lines.length * 4 + 8;
   }
 
-  // Footer - Terms
+  // Product catalog section — only items with image or description from tiendapisos
+  const catalogItems = presupuesto.items.filter(
+    (item) => item.producto_imagen || item.producto_descripcion
+  );
+
+  if (catalogItems.length > 0) {
+    // Start on a new page for catalog
+    doc.addPage();
+    let catY = 15;
+
+    // Catalog header
+    doc.setFillColor(...EMERALD);
+    doc.rect(0, 0, pageW, 25, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("Detalle de Productos", pageW / 2, 16, { align: "center" });
+
+    catY = 35;
+
+    for (const item of catalogItems) {
+      // Check if we need a new page (each card ~70px tall)
+      if (catY + 75 > doc.internal.pageSize.getHeight() - 20) {
+        doc.addPage();
+        catY = 15;
+      }
+
+      // Card background
+      doc.setFillColor(248, 248, 248);
+      doc.roundedRect(10, catY, pageW - 20, 65, 3, 3, "F");
+      doc.setDrawColor(220, 220, 220);
+      doc.roundedRect(10, catY, pageW - 20, 65, 3, 3, "S");
+
+      let textX = 15;
+
+      // Try to load product image
+      if (item.producto_imagen) {
+        try {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = () => reject();
+            img.src = item.producto_imagen!;
+          });
+          doc.addImage(img, "JPEG", 15, catY + 5, 50, 50);
+          textX = 70;
+        } catch {
+          // Skip image if can't load
+        }
+      }
+
+      // Product name
+      doc.setTextColor(...EMERALD);
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.text(item.producto_nombre, textX, catY + 12);
+
+      // Price
+      doc.setTextColor(80, 80, 80);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text(fmt(item.precio_unitario) + " / unidad", textX, catY + 20);
+
+      // Description
+      if (item.producto_descripcion) {
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(100, 100, 100);
+        const descLines = doc.splitTextToSize(item.producto_descripcion, pageW - textX - 20);
+        doc.text(descLines.slice(0, 5), textX, catY + 28);
+      }
+
+      catY += 72;
+    }
+  }
+
+  // Footer - Terms (on last page)
   const footerY = doc.internal.pageSize.getHeight() - 30;
   doc.setDrawColor(200, 200, 200);
   doc.line(10, footerY, pageW - 10, footerY);

@@ -9,6 +9,7 @@ import { toast } from "sonner";
 interface EnrichedItem {
   producto_nombre: string;
   producto_imagen: string | null;
+  producto_descripcion?: string | null;
   tipo: "material" | "mano_obra";
   precio_unitario: number;
   cantidad: number;
