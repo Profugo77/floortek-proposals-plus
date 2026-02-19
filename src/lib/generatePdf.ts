@@ -30,8 +30,8 @@ async function loadImageForPdf(url: string): Promise<string | null> {
   });
 }
 
-/** Load logo as base64 (PNG to preserve transparency) */
-async function loadLogo(): Promise<string | null> {
+/** Load header image as base64 */
+async function loadHeaderImage(): Promise<string | null> {
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -48,7 +48,7 @@ async function loadLogo(): Promise<string | null> {
       }
     };
     img.onerror = () => resolve(null);
-    img.src = "/logo_floortek_pdf.png";
+    img.src = "/header_pdf.png";
   });
 }
 
@@ -93,16 +93,16 @@ function drawFooter(doc: jsPDF) {
   doc.line(pageW / 2, footerY + 3, pageW / 2, pageH - 3);
 }
 
-/** Draw header bar with logo */
-function drawHeader(doc: jsPDF, logoData: string | null, presupuesto?: Presupuesto) {
+/** Draw header with full-width image */
+function drawHeader(doc: jsPDF, headerData: string | null, presupuesto?: Presupuesto) {
   const pageW = doc.internal.pageSize.getWidth();
+  const headerH = 32;
 
-  doc.setFillColor(...EMERALD);
-  doc.rect(0, 0, pageW, 32, "F");
-
-  // Logo - proportional as per brand reference
-  if (logoData) {
-    doc.addImage(logoData, "PNG", 8, 3, 40, 26);
+  if (headerData) {
+    doc.addImage(headerData, "PNG", 0, 0, pageW, headerH);
+  } else {
+    doc.setFillColor(...EMERALD);
+    doc.rect(0, 0, pageW, headerH, "F");
   }
 
   if (presupuesto) {
@@ -121,11 +121,11 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
   const doc = new jsPDF();
   const pageW = doc.internal.pageSize.getWidth();
 
-  // Pre-load logo
-  const logoData = await loadLogo();
+  // Pre-load header image
+  const headerData = await loadHeaderImage();
 
   // Header
-  drawHeader(doc, logoData, presupuesto);
+  drawHeader(doc, headerData, presupuesto);
 
   // Client info
   let y = 37;
