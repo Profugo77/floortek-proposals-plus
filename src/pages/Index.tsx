@@ -459,7 +459,7 @@ const Index = () => {
                     onCheckedChange={(v) => setMostrarTotalGeneral(!!v)}
                   />
                   <Label htmlFor="total-general" className="text-sm font-medium cursor-pointer">
-                    Incluir Total General (suma de todas las alternativas)
+                    Incluir Total General
                   </Label>
                   <span className="text-xs text-muted-foreground">
                     — aparece al final del presupuesto y el PDF
@@ -481,7 +481,7 @@ const Index = () => {
                 <Card className="border-2 border-primary">
                   <CardHeader className="pb-2 pt-3">
                     <CardTitle className="text-sm font-bold text-primary uppercase tracking-wide">
-                      Total General — Suma de Alternativas
+                      Total General
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="pb-3">
