@@ -57,14 +57,13 @@ export function calcularTotales(items: PresupuestoItem[]) {
       // Precio YA incluye 21% IVA → neto = precio / 1.21
       netoMateriales += subtotalConDesc / 1.21;
     } else {
-      // Mano de obra NO incluye IVA
+      // Mano de obra: precio es el final, sin IVA
       netoManoObra += subtotalConDesc;
     }
   });
 
-  const ivaMateriales = netoMateriales * 0.21;
-  const ivaManoObra = netoManoObra * 0.21;
-  const ivaTotal = ivaMateriales + ivaManoObra;
+  // Solo los materiales generan IVA (21% sobre el neto)
+  const ivaTotal = netoMateriales * 0.21;
   const total = netoMateriales + netoManoObra + ivaTotal;
 
   return {
