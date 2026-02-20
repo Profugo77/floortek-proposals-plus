@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Alternativa, PresupuestoItem, Producto, calcularTotales, calcularSubtotalItem } from "@/types/presupuesto";
 import { supabase } from "@/integrations/supabase/client";
 import { generatePresupuestoPdf } from "@/lib/generatePdf";
@@ -51,6 +52,7 @@ const Index = () => {
   // Alternatives
   const [useAlternativas, setUseAlternativas] = useState(false);
   const [alternativas, setAlternativas] = useState<Alternativa[]>([]);
+  const [mostrarTotalGeneral, setMostrarTotalGeneral] = useState(false);
 
   // Manual item fields
   const [manualNombre, setManualNombre] = useState("");
@@ -236,6 +238,7 @@ const Index = () => {
     setItems([]);
     setUseAlternativas(false);
     setAlternativas([]);
+    setMostrarTotalGeneral(false);
   }, []);
 
   const guardarYGenerarPdf = async () => {
@@ -386,6 +389,7 @@ const Index = () => {
         fecha: presupuestoFecha,
         items: useAlternativas ? [] : items,
         alternativas: useAlternativas ? alternativas : undefined,
+        mostrarTotalGeneral: useAlternativas && mostrarTotalGeneral && alternativas.length > 1,
       });
 
       const label = editId ? "actualizado" : "guardado";
@@ -444,7 +448,54 @@ const Index = () => {
         </Card>
 
         {useAlternativas ? (
-          <AlternativasManager alternativas={alternativas} onChange={setAlternativas} />
+          <>
+            <AlternativasManager alternativas={alternativas} onChange={setAlternativas} />
+            {alternativas.length > 1 && (
+              <Card>
+                <CardContent className="py-3 flex items-center gap-3">
+                  <Checkbox
+                    id="total-general"
+                    checked={mostrarTotalGeneral}
+                    onCheckedChange={(v) => setMostrarTotalGeneral(!!v)}
+                  />
+                  <Label htmlFor="total-general" className="text-sm font-medium cursor-pointer">
+                    Incluir Total General (suma de todas las alternativas)
+                  </Label>
+                  <span className="text-xs text-muted-foreground">
+                    — aparece al final del presupuesto y el PDF
+                  </span>
+                </CardContent>
+              </Card>
+            )}
+            {useAlternativas && mostrarTotalGeneral && alternativas.length > 1 && (() => {
+              const grand = alternativas.reduce(
+                (acc, a) => ({
+                  subtotal_materiales: acc.subtotal_materiales + a.subtotal_materiales,
+                  subtotal_mano_obra: acc.subtotal_mano_obra + a.subtotal_mano_obra,
+                  iva: acc.iva + a.iva,
+                  total: acc.total + a.total,
+                }),
+                { subtotal_materiales: 0, subtotal_mano_obra: 0, iva: 0, total: 0 }
+              );
+              return (
+                <Card className="border-2 border-primary">
+                  <CardHeader className="pb-2 pt-3">
+                    <CardTitle className="text-sm font-bold text-primary uppercase tracking-wide">
+                      Total General — Suma de Alternativas
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pb-3">
+                    <TotalesPanel
+                      subtotalMateriales={grand.subtotal_materiales}
+                      subtotalManoObra={grand.subtotal_mano_obra}
+                      iva={grand.iva}
+                      total={grand.total}
+                    />
+                  </CardContent>
+                </Card>
+              );
+            })()}
+          </>
         ) : (
           <Card>
             <CardHeader className="pb-3">
