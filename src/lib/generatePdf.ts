@@ -266,7 +266,7 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
-      doc.text("TOTAL GENERAL (SUMA DE ALTERNATIVAS)", 15, y + 6);
+      doc.text("TOTAL GENERAL", 15, y + 6);
       y += 12;
 
       drawTotals(doc, grandTotal, y - 5);
