@@ -44,6 +44,7 @@ export interface Presupuesto {
   subtotal_mano_obra: number;
   iva: number;
   total: number;
+  mostrarTotalGeneral?: boolean;
 }
 
 export function calcularTotales(items: PresupuestoItem[]) {

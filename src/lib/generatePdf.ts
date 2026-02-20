@@ -240,6 +240,37 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
       const totalsEndY = drawTotals(doc, alt, tableEndY);
       y = totalsEndY + 15;
     }
+
+    // Total general de todas las alternativas
+    if (presupuesto.mostrarTotalGeneral && presupuesto.alternativas!.length > 1) {
+      const grandTotal = presupuesto.alternativas!.reduce(
+        (acc, a) => ({
+          subtotal_materiales: acc.subtotal_materiales + a.subtotal_materiales,
+          subtotal_mano_obra: acc.subtotal_mano_obra + a.subtotal_mano_obra,
+          iva: acc.iva + a.iva,
+          total: acc.total + a.total,
+        }),
+        { subtotal_materiales: 0, subtotal_mano_obra: 0, iva: 0, total: 0 }
+      );
+
+      // Check if we need a new page
+      if (y + 80 > pageH - 38) {
+        doc.addPage();
+        drawHeader(doc, headerData, presupuesto);
+        y = 37;
+      }
+
+      // Grand total header bar
+      doc.setFillColor(30, 30, 30);
+      doc.rect(10, y, pageW - 20, 8, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.text("TOTAL GENERAL (SUMA DE ALTERNATIVAS)", 15, y + 6);
+      y += 12;
+
+      drawTotals(doc, grandTotal, y - 5);
+    }
   } else {
     // Single items list (no alternativas)
     const tableEndY = drawItemsTable(doc, presupuesto.items, y);
