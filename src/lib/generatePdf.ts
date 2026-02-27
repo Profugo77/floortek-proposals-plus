@@ -393,5 +393,6 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
     }
   }
 
-  doc.save(`FloorTek-FT-${String(presupuesto.numero || 0).padStart(4, "0")}.pdf`);
+  const safeNombre = presupuesto.cliente_nombre.replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ ]/g, "").trim().replace(/\s+/g, "_");
+  doc.save(`FloorTek-FT-${String(presupuesto.numero || 0).padStart(4, "0")}-${safeNombre}.pdf`);
 }
