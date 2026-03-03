@@ -386,6 +386,7 @@ const Index = () => {
         cliente_nombre: clienteNombre,
         cliente_direccion: clienteDireccion,
         cliente_telefono: clienteTelefono,
+        comentarios,
         fecha: presupuestoFecha,
         items: useAlternativas ? [] : items,
         alternativas: useAlternativas ? alternativas : undefined,
