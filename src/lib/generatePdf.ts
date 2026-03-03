@@ -319,12 +319,20 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
     : presupuesto.items;
 
   const seenNames = new Set<string>();
-  const catalogItems = allItems.filter((item) => {
-    if (!(item.producto_imagen || item.producto_descripcion)) return false;
-    if (seenNames.has(item.producto_nombre)) return false;
-    seenNames.add(item.producto_nombre);
-    return true;
-  });
+  const catalogItems = allItems
+    .filter((item) => {
+      if (!(item.producto_imagen || item.producto_descripcion)) return false;
+      if (seenNames.has(item.producto_nombre)) return false;
+      seenNames.add(item.producto_nombre);
+      return true;
+    })
+    .map((item) => {
+      // Excluir imágenes de productos Pallmann (no mostrar imagen de piso)
+      if (item.producto_nombre.toLowerCase().includes("pallmann")) {
+        return { ...item, producto_imagen: undefined };
+      }
+      return item;
+    });
 
   if (catalogItems.length > 0) {
     for (let ci = 0; ci < catalogItems.length; ci++) {
