@@ -328,7 +328,8 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
     })
     .map((item) => {
       // Excluir imágenes de productos Pallmann (no mostrar imagen de piso)
-      if (item.producto_nombre.toLowerCase().includes("pallmann")) {
+      const nameL = item.producto_nombre.toLowerCase();
+      if (nameL.includes("pallmann") || nameL.startsWith("pall x") || nameL.startsWith("pall ")) {
         return { ...item, producto_imagen: undefined };
       }
       return item;
