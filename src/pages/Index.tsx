@@ -196,7 +196,8 @@ const Index = () => {
   const updateItem = useCallback((index: number, field: string, value: string | number) => {
     setItems((prev) => {
       const updated = [...prev];
-      const item = { ...updated[index], [field]: value };
+      const parsedValue = field === "mostrar_imagen" ? value === 1 : value;
+      const item = { ...updated[index], [field]: parsedValue };
       item.subtotal = calcularSubtotalItem(item);
       updated[index] = item;
       return updated;
