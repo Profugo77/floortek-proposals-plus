@@ -17,6 +17,7 @@ export interface PresupuestoItem {
   cantidad: number;
   descuento: number;
   subtotal: number;
+  mostrar_imagen?: boolean;
 }
 
 export interface Alternativa {

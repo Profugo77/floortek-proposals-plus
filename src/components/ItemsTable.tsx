@@ -1,8 +1,9 @@
 import { PresupuestoItem, calcularSubtotalItem } from "@/types/presupuesto";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2 } from "lucide-react";
+import { Trash2, ImageIcon } from "lucide-react";
 
 interface Props {
   items: PresupuestoItem[];
