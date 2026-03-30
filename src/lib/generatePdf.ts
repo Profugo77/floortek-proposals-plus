@@ -321,6 +321,8 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto) {
   const seenNames = new Set<string>();
   const catalogItems = allItems
     .filter((item) => {
+      // Excluir items donde el usuario desactivó la imagen
+      if (item.mostrar_imagen === false) return false;
       if (!(item.producto_imagen || item.producto_descripcion)) return false;
       if (seenNames.has(item.producto_nombre)) return false;
       seenNames.add(item.producto_nombre);
