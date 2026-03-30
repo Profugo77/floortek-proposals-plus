@@ -297,7 +297,7 @@ const Index = () => {
         presupuestoId = editId;
         presupuestoNumero = editNumero!;
         // Mantener la fecha original del presupuesto
-        presupuestoFecha = editData?.fecha || new Date().toLocaleDateString("en-CA");
+        presupuestoFecha = editData?.fecha || new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" });
 
         // Delete old items and alternativas
         await supabase.from("presupuesto_items").delete().eq("presupuesto_id", editId);
