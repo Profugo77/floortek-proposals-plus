@@ -109,7 +109,8 @@ function drawHeader(doc: jsPDF, headerData: string | null, presupuesto?: Presupu
     doc.text(numText, pageW - 15, 13, { align: "right" });
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text(`Fecha: ${new Date(presupuesto.fecha).toLocaleDateString("es-AR")}`, pageW - 15, 20, { align: "right" });
+    const [year, month, day] = presupuesto.fecha.split("-");
+    doc.text(`Fecha: ${day}/${month}/${year}`, pageW - 15, 20, { align: "right" });
   }
 }
 

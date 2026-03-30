@@ -297,7 +297,7 @@ const Index = () => {
         presupuestoId = editId;
         presupuestoNumero = editNumero!;
         // Mantener la fecha original del presupuesto
-        presupuestoFecha = editData?.fecha || new Date().toLocaleDateString("en-CA");
+        presupuestoFecha = editData?.fecha || new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" });
 
         // Delete old items and alternativas
         await supabase.from("presupuesto_items").delete().eq("presupuesto_id", editId);
@@ -312,7 +312,7 @@ const Index = () => {
             cliente_direccion: clienteDireccion,
             cliente_telefono: clienteTelefono,
             comentarios,
-            fecha: new Date().toLocaleDateString("en-CA"),
+            fecha: new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }),
             subtotal_materiales: grandTotales.subtotal_materiales,
             subtotal_mano_obra: grandTotales.subtotal_mano_obra,
             iva: grandTotales.iva,
