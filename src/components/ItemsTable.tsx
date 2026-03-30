@@ -98,6 +98,15 @@ const ItemsTable = ({ items, onUpdate, onRemove }: Props) => {
               <td className="px-3 py-2 text-right font-semibold">
                 ${calcularSubtotalItem(item).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
               </td>
+              <td className="px-1 py-2 text-center">
+                {item.producto_imagen && (
+                  <Checkbox
+                    checked={item.mostrar_imagen !== false}
+                    onCheckedChange={(checked) => onUpdate(i, "mostrar_imagen", checked ? 1 : 0)}
+                    title="Incluir imagen en PDF"
+                  />
+                )}
+              </td>
               <td className="px-1 py-2">
                 <Button
                   variant="ghost"
