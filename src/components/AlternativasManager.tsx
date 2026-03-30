@@ -164,7 +164,8 @@ const AlternativasManager = ({ alternativas, onChange }: Props) => {
   const updateItemInAlt = useCallback((altId: string, index: number, field: string, value: string | number) => {
     updateAltItems(altId, (items) => {
       const updated = [...items];
-      const item = { ...updated[index], [field]: value };
+      const parsedValue = field === "mostrar_imagen" ? value === 1 : value;
+      const item = { ...updated[index], [field]: parsedValue };
       item.subtotal = calcularSubtotalItem(item);
       updated[index] = item;
       return updated;
