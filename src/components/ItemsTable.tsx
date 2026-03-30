@@ -25,13 +25,16 @@ const ItemsTable = ({ items, onUpdate, onRemove }: Props) => {
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-primary text-primary-foreground">
-            <th className="px-3 py-2 text-left rounded-tl-md">Producto</th>
-            <th className="px-3 py-2 text-center w-28">Tipo</th>
-            <th className="px-3 py-2 text-right w-28">Precio Unit.</th>
-            <th className="px-3 py-2 text-center w-20">Cant.</th>
-            <th className="px-3 py-2 text-center w-20">Desc.%</th>
-            <th className="px-3 py-2 text-right w-28">Subtotal</th>
-            <th className="px-3 py-2 w-10 rounded-tr-md"></th>
+             <th className="px-3 py-2 text-left rounded-tl-md">Producto</th>
+             <th className="px-3 py-2 text-center w-28">Tipo</th>
+             <th className="px-3 py-2 text-right w-28">Precio Unit.</th>
+             <th className="px-3 py-2 text-center w-20">Cant.</th>
+             <th className="px-3 py-2 text-center w-20">Desc.%</th>
+             <th className="px-3 py-2 text-right w-28">Subtotal</th>
+             <th className="px-3 py-2 text-center w-16" title="Incluir imagen en PDF">
+               <ImageIcon className="h-4 w-4 mx-auto" />
+             </th>
+             <th className="px-3 py-2 w-10 rounded-tr-md"></th>
           </tr>
         </thead>
         <tbody>
