@@ -312,7 +312,7 @@ const Index = () => {
             cliente_direccion: clienteDireccion,
             cliente_telefono: clienteTelefono,
             comentarios,
-            fecha: new Date().toLocaleDateString("en-CA"),
+            fecha: new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }),
             subtotal_materiales: grandTotales.subtotal_materiales,
             subtotal_mano_obra: grandTotales.subtotal_mano_obra,
             iva: grandTotales.iva,
