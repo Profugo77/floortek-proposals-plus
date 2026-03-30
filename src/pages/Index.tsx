@@ -311,7 +311,7 @@ const Index = () => {
             cliente_direccion: clienteDireccion,
             cliente_telefono: clienteTelefono,
             comentarios,
-            fecha: new Date().toISOString().split("T")[0],
+            fecha: new Date().toLocaleDateString("en-CA"),
             subtotal_materiales: grandTotales.subtotal_materiales,
             subtotal_mano_obra: grandTotales.subtotal_mano_obra,
             iva: grandTotales.iva,
