@@ -16,17 +16,20 @@ interface ProductoRow {
 }
 
 function parseCSV(text: string): ProductoRow[] {
-  const lines = text.split("\n").filter((l) => l.trim());
-  if (lines.length < 3) return [];
+  // Normalize line endings (handle Windows \r\n and Mac \r)
+  const lines = text.replace(/\r\n?/g, "\n").split("\n").filter((l) => l.trim());
+  if (lines.length < 2) return [];
 
   const productos: ProductoRow[] = [];
 
-  for (let i = 2; i < lines.length; i++) {
-    // Handle CSV with commas inside quotes
+  // Detect format by looking at the header row(s):
+  // Format A: ",Cotización,1415" + "Nombre,Precio USD,Precio Pesos" (4 cols, name in col[1], price in col[3])
+  // Format B: "Nombre,Precio USD,Precio Pesos" (3 cols, name in col[0], price in col[2])
+  const parseLine = (line: string): string[] => {
     const cols: string[] = [];
     let current = "";
     let inQuotes = false;
-    for (const ch of lines[i]) {
+    for (const ch of line) {
       if (ch === '"') {
         inQuotes = !inQuotes;
       } else if (ch === "," && !inQuotes) {
@@ -37,9 +40,30 @@ function parseCSV(text: string): ProductoRow[] {
       }
     }
     cols.push(current.trim());
+    return cols;
+  };
 
-    const nombre = cols[1]?.trim();
-    const precioPesos = parseFloat(cols[3]?.replace(/\./g, "").replace(",", ".") || "0");
+  // Find the header row containing "Nombre" and determine where data starts
+  let dataStart = 0;
+  let nameIdx = 0;
+  let priceIdx = 1;
+  for (let i = 0; i < Math.min(lines.length, 5); i++) {
+    const cols = parseLine(lines[i]).map((c) => c.toLowerCase());
+    const nIdx = cols.findIndex((c) => c === "nombre" || c === "producto" || c === "descripción" || c === "descripcion");
+    if (nIdx >= 0) {
+      nameIdx = nIdx;
+      // Prefer "precio pesos" / "pesos" / "precio ars"; fallback to last numeric column
+      const pIdx = cols.findIndex((c) => c.includes("peso") || c.includes("ars") || c === "precio");
+      priceIdx = pIdx >= 0 ? pIdx : cols.length - 1;
+      dataStart = i + 1;
+      break;
+    }
+  }
+
+  for (let i = dataStart; i < lines.length; i++) {
+    const cols = parseLine(lines[i]);
+    const nombre = cols[nameIdx]?.trim();
+    const precioPesos = parseFloat(cols[priceIdx]?.replace(/\./g, "").replace(",", ".") || "0");
 
     if (nombre && precioPesos > 0) {
       // Categorize based on name
