@@ -170,7 +170,7 @@ const Productos = () => {
           <CardContent className="space-y-4">
             <div className="flex gap-2 items-end flex-wrap">
               <div className="flex-1 min-w-[200px]">
-                <Label className="text-xs text-muted-foreground">Importar CSV (formato: ,Nombre,USD,Pesos)</Label>
+                <Label className="text-xs text-muted-foreground">Importar CSV (con columnas: Nombre, Precio USD, Precio Pesos)</Label>
                 <Input
                   type="file"
                   accept=".csv"
