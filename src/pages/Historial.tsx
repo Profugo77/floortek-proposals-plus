@@ -8,6 +8,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { generatePresupuestoPdf } from "@/lib/generatePdf";
 import { generateListaObraPdf } from "@/lib/generateListaObra";
 import { PresupuestoItem, Alternativa, calcularTotales } from "@/types/presupuesto";
+import { inferirUnidad, Unidad } from "@/lib/unidades";
+import UnidadesFaltantesDialog, {
+  MaterialFaltante,
+} from "@/components/UnidadesFaltantesDialog";
 import { toast } from "sonner";
 import { Search, FileDown, History, Pencil, ClipboardList } from "lucide-react";
 
@@ -33,6 +37,14 @@ const Historial = () => {
   const [presupuestos, setPresupuestos] = useState<PresupuestoRow[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+
+  // Estado del modal de unidades faltantes
+  const [pendingObra, setPendingObra] = useState<{
+    presupuesto: PresupuestoRow;
+    items: PresupuestoItem[];
+    unidadesConocidas: Record<string, string>;
+    faltantes: MaterialFaltante[];
+  } | null>(null);
 
   useEffect(() => {
     loadPresupuestos();
@@ -133,11 +145,31 @@ const Historial = () => {
     toast.success("PDF regenerado");
   };
 
+  /** Genera el PDF efectivamente, dado un mapa nombre->unidad ya completo. */
+  const ejecutarGenerarObra = (
+    p: PresupuestoRow,
+    items: PresupuestoItem[],
+    unidadesPorNombre: Record<string, string>
+  ) => {
+    try {
+      generateListaObraPdf({
+        numero: p.numero,
+        cliente_nombre: p.cliente_nombre,
+        cliente_direccion: p.cliente_direccion,
+        fecha: p.fecha,
+        items,
+        unidadesPorNombre,
+      });
+      toast.success("Lista de obra generada");
+    } catch (e: any) {
+      toast.error(e.message || "Error al generar lista");
+    }
+  };
+
   const generarListaObra = async (p: PresupuestoRow) => {
     const result = await loadFullPresupuesto(p);
     if (!result) return;
 
-    // Si hay alternativas, juntar todos los items de todas
     const allItems =
       result.alternativas.length > 0
         ? result.alternativas.flatMap((a) => a.items)
@@ -149,18 +181,84 @@ const Historial = () => {
       return;
     }
 
-    try {
-      generateListaObraPdf({
-        numero: p.numero,
-        cliente_nombre: p.cliente_nombre,
-        cliente_direccion: p.cliente_direccion,
-        fecha: p.fecha,
+    // Nombres únicos
+    const nombresUnicos = Array.from(
+      new Set(materiales.map((m) => m.producto_nombre.trim()))
+    );
+
+    // 1) Buscar unidades guardadas en productos
+    const { data: productos } = await supabase
+      .from("productos")
+      .select("nombre, unidad")
+      .in("nombre", nombresUnicos);
+
+    const unidadesGuardadas: Record<string, string> = {};
+    (productos || []).forEach((pr: any) => {
+      if (pr.unidad) unidadesGuardadas[pr.nombre.trim()] = pr.unidad;
+    });
+
+    // 2) Resolver: guardada → inferida → faltante
+    const unidadesResueltas: Record<string, string> = {};
+    const faltantes: MaterialFaltante[] = [];
+
+    nombresUnicos.forEach((nombre) => {
+      const guardada = unidadesGuardadas[nombre];
+      if (guardada) {
+        unidadesResueltas[nombre] = guardada;
+        return;
+      }
+      const inferida = inferirUnidad(nombre);
+      if (inferida) {
+        unidadesResueltas[nombre] = inferida;
+        return;
+      }
+      // Sumar cantidades para mostrar
+      const cantidad = materiales
+        .filter((m) => m.producto_nombre.trim() === nombre)
+        .reduce((acc, m) => acc + (Number(m.cantidad) || 0), 0);
+      faltantes.push({ nombre, cantidad });
+    });
+
+    // 3) Si hay faltantes, abrir modal; sino generar directo
+    if (faltantes.length > 0) {
+      setPendingObra({
+        presupuesto: p,
         items: allItems,
+        unidadesConocidas: unidadesResueltas,
+        faltantes,
       });
-      toast.success("Lista de obra generada");
-    } catch (e: any) {
-      toast.error(e.message || "Error al generar lista");
+      return;
     }
+
+    ejecutarGenerarObra(p, allItems, unidadesResueltas);
+  };
+
+  /** Callback del modal: persiste unidades y genera el PDF. */
+  const handleConfirmUnidades = async (
+    elegidas: Record<string, Unidad>
+  ) => {
+    if (!pendingObra) return;
+    const { presupuesto, items, unidadesConocidas, faltantes } = pendingObra;
+
+    // Persistir unidades elegidas en productos (upsert por nombre)
+    await Promise.all(
+      faltantes.map(async (f) => {
+        const u = elegidas[f.nombre];
+        if (!u) return;
+        await supabase
+          .from("productos")
+          .update({ unidad: u })
+          .eq("nombre", f.nombre);
+      })
+    );
+
+    const completo: Record<string, string> = { ...unidadesConocidas };
+    faltantes.forEach((f) => {
+      if (elegidas[f.nombre]) completo[f.nombre] = elegidas[f.nombre];
+    });
+
+    setPendingObra(null);
+    ejecutarGenerarObra(presupuesto, items, completo);
   };
 
   const filtered = presupuestos.filter(
@@ -261,6 +359,13 @@ const Historial = () => {
           </CardContent>
         </Card>
       </main>
+
+      <UnidadesFaltantesDialog
+        open={!!pendingObra}
+        materiales={pendingObra?.faltantes || []}
+        onCancel={() => setPendingObra(null)}
+        onConfirm={handleConfirmUnidades}
+      />
     </div>
   );
 };
