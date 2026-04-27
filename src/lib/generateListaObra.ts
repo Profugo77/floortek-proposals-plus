@@ -106,7 +106,13 @@ export function generateListaObraPdf(data: ListaObraData) {
   autoTable(doc, {
     startY: 56,
     head: [["✓", "Material", "Cantidad"]],
-    body: materiales.map((m) => ["", m.nombre, fmtCantidad(m.cantidad, m.unidad)]),
+    body: materiales.map((m) => [
+      "",
+      m.nombre,
+      m.cajas
+        ? `${fmtCantidad(m.cantidad, m.unidad)}\n(${m.cajas} caja${m.cajas > 1 ? "s" : ""})`
+        : fmtCantidad(m.cantidad, m.unidad),
+    ]),
     headStyles: {
       fillColor: [EMERALD[0], EMERALD[1], EMERALD[2]] as [number, number, number],
       textColor: [255, 255, 255],
