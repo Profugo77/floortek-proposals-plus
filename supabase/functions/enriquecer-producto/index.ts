@@ -24,7 +24,26 @@ async function imageUrlToBase64(url: string): Promise<string | null> {
   }
 }
 
-async function buscarEnTiendaPisos(productName: string): Promise<{ imagen: string | null; descripcion: string | null } | null> {
+function extraerM2PorCaja(html: string, characteristics: string[], introDesc: string | null): number | null {
+  // Busca patrones tipo "Caja x 2.20 m²", "2,20 m2 por caja", "M2 por caja: 2.20", etc.
+  const fuentes = [html, characteristics.join(' \n '), introDesc || ''].join(' \n ');
+  const patrones = [
+    /(\d+[.,]\d+|\d+)\s*m[2²]\s*(?:por|\/|x)\s*caja/i,
+    /caja\s*(?:de|x|con)?\s*(\d+[.,]\d+|\d+)\s*m[2²]/i,
+    /m[2²]\s*(?:por|\/)\s*caja\s*[:=]?\s*(\d+[.,]\d+|\d+)/i,
+    /contenido\s*(?:de\s*)?caja\s*[:=]?\s*(\d+[.,]\d+|\d+)\s*m[2²]/i,
+  ];
+  for (const re of patrones) {
+    const m = fuentes.match(re);
+    if (m && m[1]) {
+      const val = parseFloat(m[1].replace(',', '.'));
+      if (!isNaN(val) && val > 0 && val < 20) return val;
+    }
+  }
+  return null;
+}
+
+async function buscarEnTiendaPisos(productName: string): Promise<{ imagen: string | null; descripcion: string | null; m2_por_caja: number | null } | null> {
   try {
     const slug = productName
       .toLowerCase()
