@@ -359,6 +359,13 @@ const Historial = () => {
           </CardContent>
         </Card>
       </main>
+
+      <UnidadesFaltantesDialog
+        open={!!pendingObra}
+        materiales={pendingObra?.faltantes || []}
+        onCancel={() => setPendingObra(null)}
+        onConfirm={handleConfirmUnidades}
+      />
     </div>
   );
 };
