@@ -465,6 +465,13 @@ const Historial = () => {
         </Card>
       </main>
 
+      <M2PorCajaDialog
+        open={!!pendingCajas}
+        pisos={pendingCajas?.pisosFaltantes || []}
+        onCancel={() => setPendingCajas(null)}
+        onConfirm={handleConfirmCajas}
+      />
+
       <UnidadesFaltantesDialog
         open={!!pendingObra}
         materiales={pendingObra?.faltantes || []}
