@@ -54,7 +54,7 @@ export function generateListaObraPdf(data: ListaObraData) {
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
 
-  const materiales = consolidarMateriales(data.items);
+  const materiales = consolidarMateriales(data.items, data.unidadesPorNombre);
 
   if (materiales.length === 0) {
     throw new Error("No hay materiales en este presupuesto");
@@ -93,7 +93,7 @@ export function generateListaObraPdf(data: ListaObraData) {
   autoTable(doc, {
     startY: 56,
     head: [["✓", "Material", "Cantidad"]],
-    body: materiales.map((m) => ["", m.nombre, String(m.cantidad)]),
+    body: materiales.map((m) => ["", m.nombre, fmtCantidad(m.cantidad, m.unidad)]),
     headStyles: {
       fillColor: [EMERALD[0], EMERALD[1], EMERALD[2]] as [number, number, number],
       textColor: [255, 255, 255],
@@ -110,7 +110,7 @@ export function generateListaObraPdf(data: ListaObraData) {
     columnStyles: {
       0: { cellWidth: 14, halign: "center" },
       1: { cellWidth: "auto" as any },
-      2: { cellWidth: 30, halign: "center", fontStyle: "bold" },
+      2: { cellWidth: 38, halign: "center", fontStyle: "bold" },
     },
     margin: { left: 10, right: 10 },
     didDrawCell: (cellData) => {
@@ -212,9 +212,24 @@ export function generateListaObraPdf(data: ListaObraData) {
     doc.text("CANTIDAD", pageW / 2, 220, { align: "center" });
 
     doc.setTextColor(0, 0, 0);
-    doc.setFontSize(110);
     doc.setFont("helvetica", "bold");
-    doc.text(String(mat.cantidad), pageW / 2, pageH - 30, { align: "center" });
+
+    // Número gigante centrado y, debajo, la unidad bien grande también
+    const cantidadStr = Number.isInteger(mat.cantidad)
+      ? String(mat.cantidad)
+      : mat.cantidad.toFixed(2);
+    const tieneUnidad = !!mat.unidad;
+    const cantidadFontSize = tieneUnidad ? 95 : 110;
+    const cantidadY = tieneUnidad ? pageH - 45 : pageH - 30;
+
+    doc.setFontSize(cantidadFontSize);
+    doc.text(cantidadStr, pageW / 2, cantidadY, { align: "center" });
+
+    if (tieneUnidad) {
+      doc.setTextColor(...EMERALD);
+      doc.setFontSize(48);
+      doc.text(mat.unidad, pageW / 2, pageH - 18, { align: "center" });
+    }
   }
 
   const safeNombre = data.cliente_nombre
