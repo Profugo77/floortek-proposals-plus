@@ -1,0 +1,1 @@
+ALTER TABLE public.productos ADD COLUMN m2_por_caja numeric;

@@ -205,19 +205,20 @@ const Productos = () => {
                   <TableRow>
                     <TableHead>Producto</TableHead>
                     <TableHead>Categoría</TableHead>
+                    <TableHead className="w-32">m²/caja</TableHead>
                     <TableHead className="text-right">Precio</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                         Cargando...
                       </TableCell>
                     </TableRow>
                   ) : filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                         No hay productos. Importá un CSV para empezar.
                       </TableCell>
                     </TableRow>
@@ -226,6 +227,34 @@ const Productos = () => {
                       <TableRow key={p.id}>
                         <TableCell className="font-medium">{p.nombre}</TableCell>
                         <TableCell className="text-muted-foreground">{p.categoria}</TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            defaultValue={p.m2_por_caja ?? ""}
+                            placeholder="-"
+                            className="h-8 text-sm"
+                            onBlur={async (e) => {
+                              const raw = e.target.value.trim();
+                              const val = raw === "" ? null : parseFloat(raw);
+                              if (val !== null && (isNaN(val) || val < 0)) return;
+                              if ((p.m2_por_caja ?? null) === val) return;
+                              const { error } = await supabase
+                                .from("productos")
+                                .update({ m2_por_caja: val })
+                                .eq("id", p.id);
+                              if (error) {
+                                toast.error("No se pudo guardar");
+                              } else {
+                                toast.success("m²/caja actualizado");
+                                setProductos((prev) =>
+                                  prev.map((x) => (x.id === p.id ? { ...x, m2_por_caja: val } : x))
+                                );
+                              }
+                            }}
+                          />
+                        </TableCell>
                         <TableCell className="text-right font-semibold">
                           ${p.precio.toLocaleString("es-AR")}
                         </TableCell>

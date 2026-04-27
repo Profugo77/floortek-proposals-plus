@@ -10,16 +10,19 @@ interface ListaObraData {
   cliente_direccion: string;
   fecha: string;
   items: PresupuestoItem[];
-  /** Mapa nombre_normalizado -> unidad (m², ml, u, etc.) */
+  /** Mapa nombre -> unidad (m², ml, u, etc.) */
   unidadesPorNombre?: Record<string, string>;
+  /** Mapa nombre -> m² por caja (solo para pisos) */
+  m2PorCajaPorNombre?: Record<string, number>;
 }
 
 /** Agrupa materiales por nombre y suma cantidades */
 function consolidarMateriales(
   items: PresupuestoItem[],
-  unidadesPorNombre: Record<string, string> = {}
+  unidadesPorNombre: Record<string, string> = {},
+  m2PorCajaPorNombre: Record<string, number> = {}
 ) {
-  const map = new Map<string, { nombre: string; cantidad: number; unidad: string }>();
+  const map = new Map<string, { nombre: string; cantidad: number; unidad: string; cajas: number | null }>();
   items
     .filter((i) => i.tipo === "material")
     .forEach((i) => {
@@ -38,9 +41,19 @@ function consolidarMateriales(
           nombre: i.producto_nombre,
           cantidad: Number(i.cantidad) || 0,
           unidad,
+          cajas: null,
         });
       }
     });
+  // Calcular cajas para items en m²
+  for (const m of map.values()) {
+    if (m.unidad === "m²" || m.unidad === "m2") {
+      const m2caja = m2PorCajaPorNombre[m.nombre.trim()] || m2PorCajaPorNombre[m.nombre.trim().toLowerCase()];
+      if (m2caja && m2caja > 0) {
+        m.cajas = Math.ceil(m.cantidad / m2caja);
+      }
+    }
+  }
   return Array.from(map.values()).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 }
 
@@ -54,7 +67,7 @@ export function generateListaObraPdf(data: ListaObraData) {
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
 
-  const materiales = consolidarMateriales(data.items, data.unidadesPorNombre);
+  const materiales = consolidarMateriales(data.items, data.unidadesPorNombre, data.m2PorCajaPorNombre);
 
   if (materiales.length === 0) {
     throw new Error("No hay materiales en este presupuesto");
@@ -93,7 +106,13 @@ export function generateListaObraPdf(data: ListaObraData) {
   autoTable(doc, {
     startY: 56,
     head: [["✓", "Material", "Cantidad"]],
-    body: materiales.map((m) => ["", m.nombre, fmtCantidad(m.cantidad, m.unidad)]),
+    body: materiales.map((m) => [
+      "",
+      m.nombre,
+      m.cajas
+        ? `${fmtCantidad(m.cantidad, m.unidad)}\n(${m.cajas} caja${m.cajas > 1 ? "s" : ""})`
+        : fmtCantidad(m.cantidad, m.unidad),
+    ]),
     headStyles: {
       fillColor: [EMERALD[0], EMERALD[1], EMERALD[2]] as [number, number, number],
       textColor: [255, 255, 255],
@@ -219,16 +238,24 @@ export function generateListaObraPdf(data: ListaObraData) {
       ? String(mat.cantidad)
       : mat.cantidad.toFixed(2);
     const tieneUnidad = !!mat.unidad;
-    const cantidadFontSize = tieneUnidad ? 95 : 110;
-    const cantidadY = tieneUnidad ? pageH - 45 : pageH - 30;
+    const tieneCajas = !!mat.cajas;
+    const cantidadFontSize = tieneCajas ? 78 : tieneUnidad ? 95 : 110;
+    const cantidadY = tieneCajas ? pageH - 60 : tieneUnidad ? pageH - 45 : pageH - 30;
 
     doc.setFontSize(cantidadFontSize);
     doc.text(cantidadStr, pageW / 2, cantidadY, { align: "center" });
 
     if (tieneUnidad) {
       doc.setTextColor(...EMERALD);
-      doc.setFontSize(48);
-      doc.text(mat.unidad, pageW / 2, pageH - 18, { align: "center" });
+      doc.setFontSize(tieneCajas ? 36 : 48);
+      doc.text(mat.unidad, pageW / 2, tieneCajas ? pageH - 38 : pageH - 18, { align: "center" });
+    }
+
+    if (tieneCajas) {
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(28);
+      doc.text(`≈ ${mat.cajas} caja${mat.cajas! > 1 ? "s" : ""}`, pageW / 2, pageH - 15, { align: "center" });
     }
   }
 
