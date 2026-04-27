@@ -169,6 +169,7 @@ export type Database = {
           created_at: string
           id: string
           imagen_url: string | null
+          m2_por_caja: number | null
           nombre: string
           precio: number
           tipo: string
@@ -179,6 +180,7 @@ export type Database = {
           created_at?: string
           id?: string
           imagen_url?: string | null
+          m2_por_caja?: number | null
           nombre: string
           precio: number
           tipo?: string
@@ -189,6 +191,7 @@ export type Database = {
           created_at?: string
           id?: string
           imagen_url?: string | null
+          m2_por_caja?: number | null
           nombre?: string
           precio?: number
           tipo?: string
