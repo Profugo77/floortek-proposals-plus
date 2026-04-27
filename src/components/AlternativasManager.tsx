@@ -114,6 +114,9 @@ const AlternativasManager = ({ alternativas, onChange }: Props) => {
           )
         );
       }
+      if (data?.m2_por_caja) {
+        supabase.from("productos").update({ m2_por_caja: data.m2_por_caja }).eq("nombre", producto.nombre).then(() => {});
+      }
     }).catch(() => {});
   }, [updateAltItems]);
 
