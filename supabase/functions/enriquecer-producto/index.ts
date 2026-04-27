@@ -160,6 +160,9 @@ async function buscarEnTiendaPisos(productName: string): Promise<{ imagen: strin
   return null;
 }
 
+// Fallback null result helper
+const NULL_RESULT = { imagen: null, descripcion: null, m2_por_caja: null };
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
