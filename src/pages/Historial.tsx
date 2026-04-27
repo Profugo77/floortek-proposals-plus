@@ -147,13 +147,49 @@ const Historial = () => {
   };
 
   /** Genera el PDF efectivamente, dado un mapa nombre->unidad ya completo. */
-  const ejecutarGenerarObra = (
+  const ejecutarGenerarObra = async (
     p: PresupuestoRow,
     items: PresupuestoItem[],
     unidadesPorNombre: Record<string, string>,
     m2PorCajaPorNombre: Record<string, number> = {}
   ) => {
     try {
+      // Enriquecer m²/caja faltantes para pisos en m² (presupuestos viejos)
+      const pisosSinCajas = Object.entries(unidadesPorNombre)
+        .filter(([nombre, u]) => (u === "m²" || u === "m2") && !m2PorCajaPorNombre[nombre.trim()])
+        .map(([nombre]) => nombre);
+
+      if (pisosSinCajas.length > 0) {
+        const toastId = toast.loading(`Buscando m²/caja en tiendapisos para ${pisosSinCajas.length} producto(s)...`);
+        const enriquecidos: Record<string, number> = {};
+        await Promise.all(
+          pisosSinCajas.map(async (nombre) => {
+            try {
+              const { data } = await supabase.functions.invoke("enriquecer-producto", {
+                body: { nombre },
+              });
+              if (data?.m2_por_caja) {
+                enriquecidos[nombre.trim()] = Number(data.m2_por_caja);
+                await supabase
+                  .from("productos")
+                  .update({ m2_por_caja: data.m2_por_caja })
+                  .eq("nombre", nombre);
+              }
+            } catch {
+              /* noop */
+            }
+          })
+        );
+        toast.dismiss(toastId);
+        Object.assign(m2PorCajaPorNombre, enriquecidos);
+        const detectados = Object.keys(enriquecidos).length;
+        if (detectados < pisosSinCajas.length) {
+          toast.message(
+            `m²/caja detectado para ${detectados}/${pisosSinCajas.length}. Podés cargar el resto a mano en Productos.`
+          );
+        }
+      }
+
       generateListaObraPdf({
         numero: p.numero,
         cliente_nombre: p.cliente_nombre,
