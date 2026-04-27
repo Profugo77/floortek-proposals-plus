@@ -171,7 +171,7 @@ Deno.serve(async (req) => {
   try {
     const { nombre } = await req.json();
     if (!nombre || nombre.trim().length < 3) {
-      return new Response(JSON.stringify({ imagen: null, descripcion: null }), {
+      return new Response(JSON.stringify(NULL_RESULT), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -182,6 +182,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       imagen: result?.imagen || null,
       descripcion: result?.descripcion || null,
+      m2_por_caja: result?.m2_por_caja ?? null,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
