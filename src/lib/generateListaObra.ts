@@ -67,7 +67,7 @@ export function generateListaObraPdf(data: ListaObraData) {
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
 
-  const materiales = consolidarMateriales(data.items, data.unidadesPorNombre);
+  const materiales = consolidarMateriales(data.items, data.unidadesPorNombre, data.m2PorCajaPorNombre);
 
   if (materiales.length === 0) {
     throw new Error("No hay materiales en este presupuesto");
