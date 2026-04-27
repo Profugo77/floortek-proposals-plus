@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { generatePresupuestoPdf } from "@/lib/generatePdf";
+import { generateListaObraPdf } from "@/lib/generateListaObra";
 import { PresupuestoItem, Alternativa, calcularTotales } from "@/types/presupuesto";
 import { toast } from "sonner";
-import { Search, FileDown, History, Pencil } from "lucide-react";
+import { Search, FileDown, History, Pencil, ClipboardList } from "lucide-react";
 
 interface PresupuestoRow {
   id: string;
