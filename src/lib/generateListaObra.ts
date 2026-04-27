@@ -158,18 +158,43 @@ export function generateListaObraPdf(data: ListaObraData) {
     // Línea separadora
     doc.setDrawColor(...EMERALD);
     doc.setLineWidth(1.5);
-    doc.line(30, 165, pageW - 30, 165);
+    doc.line(30, 158, pageW - 30, 158);
+
+    // CLIENTE Y DIRECCIÓN - bien visibles en el cuerpo
+    doc.setTextColor(...EMERALD);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("CLIENTE", pageW / 2, 168, { align: "center" });
+
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    const nombreLines = doc.splitTextToSize(data.cliente_nombre, pageW - 30);
+    doc.text(nombreLines[0], pageW / 2, 177, { align: "center" });
+
+    doc.setTextColor(...EMERALD);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("DIRECCIÓN", pageW / 2, 188, { align: "center" });
+
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(15);
+    doc.setFont("helvetica", "normal");
+    const dirBodyLines = doc.splitTextToSize(data.cliente_direccion || "-", pageW - 30);
+    dirBodyLines.slice(0, 2).forEach((line: string, i: number) => {
+      doc.text(line, pageW / 2, 197 + i * 7, { align: "center" });
+    });
 
     // CANTIDAD - GIGANTE
     doc.setTextColor(...EMERALD);
-    doc.setFontSize(20);
+    doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
-    doc.text("CANTIDAD", pageW / 2, 185, { align: "center" });
+    doc.text("CANTIDAD", pageW / 2, 220, { align: "center" });
 
     doc.setTextColor(0, 0, 0);
-    doc.setFontSize(140);
+    doc.setFontSize(110);
     doc.setFont("helvetica", "bold");
-    doc.text(String(mat.cantidad), pageW / 2, pageH - 40, { align: "center" });
+    doc.text(String(mat.cantidad), pageW / 2, pageH - 30, { align: "center" });
   }
 
   const safeNombre = data.cliente_nombre
