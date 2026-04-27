@@ -191,12 +191,14 @@ const Historial = () => {
     // 1) Buscar unidades guardadas en productos
     const { data: productos } = await supabase
       .from("productos")
-      .select("nombre, unidad")
+      .select("nombre, unidad, m2_por_caja")
       .in("nombre", nombresUnicos);
 
     const unidadesGuardadas: Record<string, string> = {};
+    const m2PorCajaPorNombre: Record<string, number> = {};
     (productos || []).forEach((pr: any) => {
       if (pr.unidad) unidadesGuardadas[pr.nombre.trim()] = pr.unidad;
+      if (pr.m2_por_caja) m2PorCajaPorNombre[pr.nombre.trim()] = Number(pr.m2_por_caja);
     });
 
     // 2) Resolver: guardada → inferida → faltante
