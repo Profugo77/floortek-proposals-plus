@@ -133,6 +133,36 @@ const Historial = () => {
     toast.success("PDF regenerado");
   };
 
+  const generarListaObra = async (p: PresupuestoRow) => {
+    const result = await loadFullPresupuesto(p);
+    if (!result) return;
+
+    // Si hay alternativas, juntar todos los items de todas
+    const allItems =
+      result.alternativas.length > 0
+        ? result.alternativas.flatMap((a) => a.items)
+        : result.items;
+
+    const materiales = allItems.filter((i) => i.tipo === "material");
+    if (materiales.length === 0) {
+      toast.error("Este presupuesto no tiene materiales");
+      return;
+    }
+
+    try {
+      generateListaObraPdf({
+        numero: p.numero,
+        cliente_nombre: p.cliente_nombre,
+        cliente_direccion: p.cliente_direccion,
+        fecha: p.fecha,
+        items: allItems,
+      });
+      toast.success("Lista de obra generada");
+    } catch (e: any) {
+      toast.error(e.message || "Error al generar lista");
+    }
+  };
+
   const filtered = presupuestos.filter(
     (p) =>
       p.cliente_nombre.toLowerCase().includes(search.toLowerCase()) ||
