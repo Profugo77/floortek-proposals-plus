@@ -12,6 +12,7 @@ import { inferirUnidad, Unidad } from "@/lib/unidades";
 import UnidadesFaltantesDialog, {
   MaterialFaltante,
 } from "@/components/UnidadesFaltantesDialog";
+import M2PorCajaDialog, { PisoSinCajas } from "@/components/M2PorCajaDialog";
 import { toast } from "sonner";
 import { Search, FileDown, History, Pencil, ClipboardList } from "lucide-react";
 
