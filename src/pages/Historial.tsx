@@ -44,6 +44,7 @@ const Historial = () => {
     items: PresupuestoItem[];
     unidadesConocidas: Record<string, string>;
     faltantes: MaterialFaltante[];
+    m2PorCajaPorNombre: Record<string, number>;
   } | null>(null);
 
   useEffect(() => {
