@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { generatePresupuestoPdf } from "@/lib/generatePdf";
+import { generateListaObraPdf } from "@/lib/generateListaObra";
 import { PresupuestoItem, Alternativa, calcularTotales } from "@/types/presupuesto";
 import { toast } from "sonner";
-import { Search, FileDown, History, Pencil } from "lucide-react";
+import { Search, FileDown, History, Pencil, ClipboardList } from "lucide-react";
 
 interface PresupuestoRow {
   id: string;
@@ -132,6 +133,36 @@ const Historial = () => {
     toast.success("PDF regenerado");
   };
 
+  const generarListaObra = async (p: PresupuestoRow) => {
+    const result = await loadFullPresupuesto(p);
+    if (!result) return;
+
+    // Si hay alternativas, juntar todos los items de todas
+    const allItems =
+      result.alternativas.length > 0
+        ? result.alternativas.flatMap((a) => a.items)
+        : result.items;
+
+    const materiales = allItems.filter((i) => i.tipo === "material");
+    if (materiales.length === 0) {
+      toast.error("Este presupuesto no tiene materiales");
+      return;
+    }
+
+    try {
+      generateListaObraPdf({
+        numero: p.numero,
+        cliente_nombre: p.cliente_nombre,
+        cliente_direccion: p.cliente_direccion,
+        fecha: p.fecha,
+        items: allItems,
+      });
+      toast.success("Lista de obra generada");
+    } catch (e: any) {
+      toast.error(e.message || "Error al generar lista");
+    }
+  };
+
   const filtered = presupuestos.filter(
     (p) =>
       p.cliente_nombre.toLowerCase().includes(search.toLowerCase()) ||
@@ -208,6 +239,16 @@ const Historial = () => {
                             >
                               <FileDown className="h-4 w-4" />
                               PDF
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => generarListaObra(p)}
+                              className="gap-1 text-primary"
+                              title="Lista de obra: checklist + hojas A4 por material"
+                            >
+                              <ClipboardList className="h-4 w-4" />
+                              Obra
                             </Button>
                           </div>
                         </td>
