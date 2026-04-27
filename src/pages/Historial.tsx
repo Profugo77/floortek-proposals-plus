@@ -192,11 +192,30 @@ const Historial = () => {
         );
         toast.dismiss(toastId);
         Object.assign(m2PorCajaPorNombre, enriquecidos);
-        const detectados = Object.keys(enriquecidos).length;
-        if (detectados < pisosSinCajas.length) {
-          toast.message(
-            `m²/caja detectado para ${detectados}/${pisosSinCajas.length}. Podés cargar el resto a mano en Productos.`
-          );
+
+        // Si después del scraping siguen faltando, abrir modal manual
+        const aunFaltantes = pisosSinCajas.filter((n) => !m2PorCajaPorNombre[n.trim()]);
+        if (aunFaltantes.length > 0) {
+          // Calcular cantidades totales por nombre
+          const cantidadPorNombre: Record<string, number> = {};
+          items
+            .filter((i) => i.tipo === "material")
+            .forEach((i) => {
+              const k = i.producto_nombre.trim();
+              cantidadPorNombre[k] = (cantidadPorNombre[k] || 0) + (Number(i.cantidad) || 0);
+            });
+
+          setPendingCajas({
+            presupuesto: p,
+            items,
+            unidadesPorNombre,
+            m2PorCajaPorNombre,
+            pisosFaltantes: aunFaltantes.map((n) => ({
+              nombre: n,
+              cantidadM2: Math.round((cantidadPorNombre[n.trim()] || 0) * 100) / 100,
+            })),
+          });
+          return;
         }
       }
 
@@ -213,6 +232,40 @@ const Historial = () => {
     } catch (e: any) {
       toast.error(e.message || "Error al generar lista");
     }
+  };
+
+  /** Callback del modal de m²/caja: persiste valores y genera el PDF. */
+  const handleConfirmCajas = async (valores: Record<string, number>) => {
+    if (!pendingCajas) return;
+    const { presupuesto, items, unidadesPorNombre, m2PorCajaPorNombre } = pendingCajas;
+
+    // Persistir en productos
+    await Promise.all(
+      Object.entries(valores).map(async ([nombre, val]) => {
+        await supabase
+          .from("productos")
+          .update({ m2_por_caja: val })
+          .eq("nombre", nombre);
+      })
+    );
+
+    const merged = { ...m2PorCajaPorNombre };
+    Object.entries(valores).forEach(([nombre, val]) => {
+      merged[nombre.trim()] = val;
+    });
+
+    setPendingCajas(null);
+
+    generateListaObraPdf({
+      numero: presupuesto.numero,
+      cliente_nombre: presupuesto.cliente_nombre,
+      cliente_direccion: presupuesto.cliente_direccion,
+      fecha: presupuesto.fecha,
+      items,
+      unidadesPorNombre,
+      m2PorCajaPorNombre: merged,
+    });
+    toast.success("Lista de obra generada");
   };
 
   const generarListaObra = async (p: PresupuestoRow) => {
