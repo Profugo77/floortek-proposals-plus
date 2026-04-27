@@ -277,7 +277,7 @@ export function generateListaObraPdf(data: ListaObraData) {
       y += gapCajas + cajasH;
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(cajasFont);
-      doc.text(`≈ ${mat.cajas} caja${mat.cajas! > 1 ? "s" : ""}`, pageW / 2, y, { align: "center" });
+      doc.text(`${mat.cajas} caja${mat.cajas! > 1 ? "s" : ""}`, pageW / 2, y, { align: "center" });
     }
   }
 
