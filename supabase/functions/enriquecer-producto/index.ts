@@ -188,7 +188,7 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     console.error('Error:', error);
-    return new Response(JSON.stringify({ imagen: null, descripcion: null }), {
+    return new Response(JSON.stringify(NULL_RESULT), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
