@@ -10,16 +10,19 @@ interface ListaObraData {
   cliente_direccion: string;
   fecha: string;
   items: PresupuestoItem[];
-  /** Mapa nombre_normalizado -> unidad (m², ml, u, etc.) */
+  /** Mapa nombre -> unidad (m², ml, u, etc.) */
   unidadesPorNombre?: Record<string, string>;
+  /** Mapa nombre -> m² por caja (solo para pisos) */
+  m2PorCajaPorNombre?: Record<string, number>;
 }
 
 /** Agrupa materiales por nombre y suma cantidades */
 function consolidarMateriales(
   items: PresupuestoItem[],
-  unidadesPorNombre: Record<string, string> = {}
+  unidadesPorNombre: Record<string, string> = {},
+  m2PorCajaPorNombre: Record<string, number> = {}
 ) {
-  const map = new Map<string, { nombre: string; cantidad: number; unidad: string }>();
+  const map = new Map<string, { nombre: string; cantidad: number; unidad: string; cajas: number | null }>();
   items
     .filter((i) => i.tipo === "material")
     .forEach((i) => {
@@ -38,9 +41,19 @@ function consolidarMateriales(
           nombre: i.producto_nombre,
           cantidad: Number(i.cantidad) || 0,
           unidad,
+          cajas: null,
         });
       }
     });
+  // Calcular cajas para items en m²
+  for (const m of map.values()) {
+    if (m.unidad === "m²" || m.unidad === "m2") {
+      const m2caja = m2PorCajaPorNombre[m.nombre.trim()] || m2PorCajaPorNombre[m.nombre.trim().toLowerCase()];
+      if (m2caja && m2caja > 0) {
+        m.cajas = Math.ceil(m.cantidad / m2caja);
+      }
+    }
+  }
   return Array.from(map.values()).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 }
 
