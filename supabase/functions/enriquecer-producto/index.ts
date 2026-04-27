@@ -25,21 +25,74 @@ async function imageUrlToBase64(url: string): Promise<string | null> {
 }
 
 function extraerM2PorCaja(html: string, characteristics: string[], introDesc: string | null): number | null {
-  // Busca patrones tipo "Caja x 2.20 m²", "2,20 m2 por caja", "M2 por caja: 2.20", etc.
-  const fuentes = [html, characteristics.join(' \n '), introDesc || ''].join(' \n ');
-  const patrones = [
-    /(\d+[.,]\d+|\d+)\s*m[2²]\s*(?:por|\/|x)\s*caja/i,
-    /caja\s*(?:de|x|con)?\s*(\d+[.,]\d+|\d+)\s*m[2²]/i,
-    /m[2²]\s*(?:por|\/)\s*caja\s*[:=]?\s*(\d+[.,]\d+|\d+)/i,
-    /contenido\s*(?:de\s*)?caja\s*[:=]?\s*(\d+[.,]\d+|\d+)\s*m[2²]/i,
+  // Decodifica entidades HTML básicas y normaliza
+  const decode = (s: string) =>
+    s.replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&#178;|&sup2;/gi, '²')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ');
+
+  const htmlClean = decode(html);
+  const fuentes = [
+    htmlClean,
+    characteristics.join(' \n '),
+    introDesc || '',
+  ].join(' \n ');
+
+  // 1) Patrones explícitos "X m² por/x/de caja" y variantes
+  const patronesDirectos = [
+    /(\d+[.,]?\d*)\s*m[2²]\s*(?:por|\/|x|de)\s*caja/i,
+    /caja\s*(?:de|x|con|contiene|=)?\s*(\d+[.,]?\d*)\s*m[2²]/i,
+    /m[2²]\s*(?:por|\/)\s*caja\s*[:=]?\s*(\d+[.,]?\d*)/i,
+    /contenido\s*(?:de\s*)?caja\s*[:=]?\s*(\d+[.,]?\d*)\s*m[2²]/i,
+    /rendimiento\s*(?:por\s*)?caja\s*[:=]?\s*(\d+[.,]?\d*)\s*m[2²]/i,
+    /superficie\s*(?:por\s*)?caja\s*[:=]?\s*(\d+[.,]?\d*)\s*m[2²]/i,
+    /cobertura\s*(?:por\s*)?caja\s*[:=]?\s*(\d+[.,]?\d*)\s*m[2²]/i,
+    /(\d+[.,]?\d*)\s*m[2²]\s*\/\s*caja/i,
+    /caja\s*[:=]\s*(\d+[.,]?\d*)\s*m[2²]/i,
   ];
-  for (const re of patrones) {
+  for (const re of patronesDirectos) {
     const m = fuentes.match(re);
     if (m && m[1]) {
       const val = parseFloat(m[1].replace(',', '.'));
       if (!isNaN(val) && val > 0 && val < 20) return val;
     }
   }
+
+  // 2) Calcular desde dimensiones de plancha + cantidad de planchas/láminas por caja
+  // Ej: "1220 x 180 mm" + "8 láminas por caja" => (1.22 * 0.18) * 8
+  const dimMatches = [
+    ...fuentes.matchAll(/(\d{3,4})\s*[xX×]\s*(\d{2,4})\s*mm/g),
+  ];
+  const cantPorCaja = fuentes.match(
+    /(\d{1,3})\s*(?:l[áa]minas?|planchas?|tablas?|piezas?|placas?|unidades?|pzas?)\s*(?:por|\/|x|en)\s*caja/i,
+  ) || fuentes.match(
+    /caja\s*(?:de|con|contiene|=|x)?\s*(\d{1,3})\s*(?:l[áa]minas?|planchas?|tablas?|piezas?|placas?|unidades?|pzas?)/i,
+  );
+
+  if (dimMatches.length > 0 && cantPorCaja) {
+    const w = parseInt(dimMatches[0][1], 10);
+    const h = parseInt(dimMatches[0][2], 10);
+    const n = parseInt(cantPorCaja[1], 10);
+    if (w > 0 && h > 0 && n > 0) {
+      const m2 = (w / 1000) * (h / 1000) * n;
+      if (m2 > 0 && m2 < 20) return Math.round(m2 * 100) / 100;
+    }
+  }
+
+  // 3) Buscar en JSON-LD / metadata
+  const jsonLdMatches = [...html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)];
+  for (const m of jsonLdMatches) {
+    const txt = m[1];
+    const re = /(\d+[.,]?\d*)\s*m[2²]\s*(?:por|\/|x|de)\s*caja/i;
+    const found = txt.match(re);
+    if (found && found[1]) {
+      const val = parseFloat(found[1].replace(',', '.'));
+      if (!isNaN(val) && val > 0 && val < 20) return val;
+    }
+  }
+
   return null;
 }
 
