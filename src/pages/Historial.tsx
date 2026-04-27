@@ -240,6 +240,16 @@ const Historial = () => {
                               <FileDown className="h-4 w-4" />
                               PDF
                             </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => generarListaObra(p)}
+                              className="gap-1 text-primary"
+                              title="Lista de obra: checklist + hojas A4 por material"
+                            >
+                              <ClipboardList className="h-4 w-4" />
+                              Obra
+                            </Button>
                           </div>
                         </td>
                       </tr>
