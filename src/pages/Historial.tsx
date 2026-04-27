@@ -231,11 +231,12 @@ const Historial = () => {
         items: allItems,
         unidadesConocidas: unidadesResueltas,
         faltantes,
+        m2PorCajaPorNombre,
       });
       return;
     }
 
-    ejecutarGenerarObra(p, allItems, unidadesResueltas);
+    ejecutarGenerarObra(p, allItems, unidadesResueltas, m2PorCajaPorNombre);
   };
 
   /** Callback del modal: persiste unidades y genera el PDF. */
