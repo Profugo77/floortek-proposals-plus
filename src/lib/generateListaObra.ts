@@ -119,14 +119,19 @@ export function generateListaObraPdf(data: ListaObraData) {
   for (const mat of materiales) {
     doc.addPage();
 
-    // Banda superior pequeña con número de presupuesto y cliente (referencia)
+    // Banda superior con número de presupuesto, cliente y dirección (referencia obra)
     doc.setFillColor(...EMERALD);
-    doc.rect(0, 0, pageW, 14, "F");
+    doc.rect(0, 0, pageW, 20, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text(`${numStr}  -  ${data.cliente_nombre}`, 10, 8);
     doc.setFont("helvetica", "normal");
-    doc.text(`${numStr}  -  ${data.cliente_nombre}`, 10, 9);
-    doc.text(fechaStr, pageW - 10, 9, { align: "right" });
+    doc.setFontSize(8);
+    const dirText = `Obra: ${data.cliente_direccion || "-"}`;
+    const dirLines = doc.splitTextToSize(dirText, pageW - 50);
+    doc.text(dirLines[0], 10, 14);
+    doc.text(fechaStr, pageW - 10, 8, { align: "right" });
 
     // Nombre del material - GRANDE, centrado vertical/horizontal en parte superior
     doc.setTextColor(0, 0, 0);
