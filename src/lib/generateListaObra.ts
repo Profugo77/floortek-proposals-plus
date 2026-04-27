@@ -238,16 +238,24 @@ export function generateListaObraPdf(data: ListaObraData) {
       ? String(mat.cantidad)
       : mat.cantidad.toFixed(2);
     const tieneUnidad = !!mat.unidad;
-    const cantidadFontSize = tieneUnidad ? 95 : 110;
-    const cantidadY = tieneUnidad ? pageH - 45 : pageH - 30;
+    const tieneCajas = !!mat.cajas;
+    const cantidadFontSize = tieneCajas ? 78 : tieneUnidad ? 95 : 110;
+    const cantidadY = tieneCajas ? pageH - 60 : tieneUnidad ? pageH - 45 : pageH - 30;
 
     doc.setFontSize(cantidadFontSize);
     doc.text(cantidadStr, pageW / 2, cantidadY, { align: "center" });
 
     if (tieneUnidad) {
       doc.setTextColor(...EMERALD);
-      doc.setFontSize(48);
-      doc.text(mat.unidad, pageW / 2, pageH - 18, { align: "center" });
+      doc.setFontSize(tieneCajas ? 36 : 48);
+      doc.text(mat.unidad, pageW / 2, tieneCajas ? pageH - 38 : pageH - 18, { align: "center" });
+    }
+
+    if (tieneCajas) {
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(28);
+      doc.text(`≈ ${mat.cajas} caja${mat.cajas! > 1 ? "s" : ""}`, pageW / 2, pageH - 15, { align: "center" });
     }
   }
 
