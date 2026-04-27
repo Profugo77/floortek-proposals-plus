@@ -10,24 +10,44 @@ interface ListaObraData {
   cliente_direccion: string;
   fecha: string;
   items: PresupuestoItem[];
+  /** Mapa nombre_normalizado -> unidad (m², ml, u, etc.) */
+  unidadesPorNombre?: Record<string, string>;
 }
 
 /** Agrupa materiales por nombre y suma cantidades */
-function consolidarMateriales(items: PresupuestoItem[]) {
-  const map = new Map<string, { nombre: string; cantidad: number }>();
+function consolidarMateriales(
+  items: PresupuestoItem[],
+  unidadesPorNombre: Record<string, string> = {}
+) {
+  const map = new Map<string, { nombre: string; cantidad: number; unidad: string }>();
   items
     .filter((i) => i.tipo === "material")
     .forEach((i) => {
       const key = i.producto_nombre.trim();
+      const unidad =
+        (i as any).unidad ||
+        unidadesPorNombre[key] ||
+        unidadesPorNombre[key.toLowerCase()] ||
+        "";
       const existing = map.get(key);
       if (existing) {
         existing.cantidad += Number(i.cantidad) || 0;
+        if (!existing.unidad && unidad) existing.unidad = unidad;
       } else {
-        map.set(key, { nombre: i.producto_nombre, cantidad: Number(i.cantidad) || 0 });
+        map.set(key, {
+          nombre: i.producto_nombre,
+          cantidad: Number(i.cantidad) || 0,
+          unidad,
+        });
       }
     });
   return Array.from(map.values()).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 }
+
+const fmtCantidad = (c: number, unidad: string) => {
+  const num = Number.isInteger(c) ? String(c) : c.toFixed(2);
+  return unidad ? `${num} ${unidad}` : num;
+};
 
 export function generateListaObraPdf(data: ListaObraData) {
   const doc = new jsPDF();
