@@ -150,7 +150,10 @@ async function buscarEnTiendaPisos(productName: string): Promise<{ imagen: strin
       console.log(`Image converted: ${imagen ? 'yes' : 'no'}`);
     }
 
-    return { imagen, descripcion };
+    const m2_por_caja = extraerM2PorCaja(html, characteristics, introDesc);
+    console.log(`m² por caja: ${m2_por_caja ?? 'no detectado'}`);
+
+    return { imagen, descripcion, m2_por_caja };
   } catch (e) {
     console.error('Error fetching product page:', e);
   }
