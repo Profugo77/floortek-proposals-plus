@@ -149,7 +149,8 @@ const Historial = () => {
   const ejecutarGenerarObra = (
     p: PresupuestoRow,
     items: PresupuestoItem[],
-    unidadesPorNombre: Record<string, string>
+    unidadesPorNombre: Record<string, string>,
+    m2PorCajaPorNombre: Record<string, number> = {}
   ) => {
     try {
       generateListaObraPdf({
@@ -159,6 +160,7 @@ const Historial = () => {
         fecha: p.fecha,
         items,
         unidadesPorNombre,
+        m2PorCajaPorNombre,
       });
       toast.success("Lista de obra generada");
     } catch (e: any) {
