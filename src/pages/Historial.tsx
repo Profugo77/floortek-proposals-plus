@@ -48,6 +48,15 @@ const Historial = () => {
     m2PorCajaPorNombre: Record<string, number>;
   } | null>(null);
 
+  // Modal para pedir m²/caja cuando el scraping no lo detectó
+  const [pendingCajas, setPendingCajas] = useState<{
+    presupuesto: PresupuestoRow;
+    items: PresupuestoItem[];
+    unidadesPorNombre: Record<string, string>;
+    m2PorCajaPorNombre: Record<string, number>;
+    pisosFaltantes: PisoSinCajas[];
+  } | null>(null);
+
   useEffect(() => {
     loadPresupuestos();
   }, []);
