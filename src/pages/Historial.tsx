@@ -244,7 +244,7 @@ const Historial = () => {
     elegidas: Record<string, Unidad>
   ) => {
     if (!pendingObra) return;
-    const { presupuesto, items, unidadesConocidas, faltantes } = pendingObra;
+    const { presupuesto, items, unidadesConocidas, faltantes, m2PorCajaPorNombre } = pendingObra;
 
     // Persistir unidades elegidas en productos (upsert por nombre)
     await Promise.all(
@@ -264,7 +264,7 @@ const Historial = () => {
     });
 
     setPendingObra(null);
-    ejecutarGenerarObra(presupuesto, items, completo);
+    ejecutarGenerarObra(presupuesto, items, completo, m2PorCajaPorNombre);
   };
 
   const filtered = presupuestos.filter(
