@@ -71,6 +71,7 @@ export type Database = {
           producto_nombre: string
           subtotal: number
           tipo: string
+          unidad: string | null
         }
         Insert: {
           alternativa_id?: string | null
@@ -84,6 +85,7 @@ export type Database = {
           producto_nombre: string
           subtotal?: number
           tipo?: string
+          unidad?: string | null
         }
         Update: {
           alternativa_id?: string | null
@@ -97,6 +99,7 @@ export type Database = {
           producto_nombre?: string
           subtotal?: number
           tipo?: string
+          unidad?: string | null
         }
         Relationships: [
           {
@@ -169,6 +172,7 @@ export type Database = {
           nombre: string
           precio: number
           tipo: string
+          unidad: string | null
         }
         Insert: {
           categoria?: string
@@ -178,6 +182,7 @@ export type Database = {
           nombre: string
           precio: number
           tipo?: string
+          unidad?: string | null
         }
         Update: {
           categoria?: string
@@ -187,6 +192,7 @@ export type Database = {
           nombre?: string
           precio?: number
           tipo?: string
+          unidad?: string | null
         }
         Relationships: []
       }
