@@ -224,38 +224,60 @@ export function generateListaObraPdf(data: ListaObraData) {
       doc.text(line, pageW / 2, 197 + i * 7, { align: "center" });
     });
 
-    // CANTIDAD - GIGANTE
-    doc.setTextColor(...EMERALD);
-    doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
-    doc.text("CANTIDAD", pageW / 2, 220, { align: "center" });
-
-    doc.setTextColor(0, 0, 0);
-    doc.setFont("helvetica", "bold");
-
-    // Número gigante centrado y, debajo, la unidad bien grande también
+    // ===== Bloque CANTIDAD (parte inferior) =====
+    // Layout vertical compacto y calculado para evitar superposición.
     const cantidadStr = Number.isInteger(mat.cantidad)
       ? String(mat.cantidad)
       : mat.cantidad.toFixed(2);
     const tieneUnidad = !!mat.unidad;
     const tieneCajas = !!mat.cajas;
-    const cantidadFontSize = tieneCajas ? 78 : tieneUnidad ? 95 : 110;
-    const cantidadY = tieneCajas ? pageH - 60 : tieneUnidad ? pageH - 45 : pageH - 30;
 
-    doc.setFontSize(cantidadFontSize);
-    doc.text(cantidadStr, pageW / 2, cantidadY, { align: "center" });
+    const numFont = tieneCajas ? 64 : tieneUnidad ? 95 : 110;
+    const unidadFont = tieneCajas ? 28 : 48;
+    const cajasFont = 26;
+    const labelFont = 14;
+    const gapLabel = 3;
+    const gapUnidad = 3;
+    const gapCajas = 6;
+    const bottomMargin = 16;
+
+    // Aprox alto de glifo en mm: pt * 0.3528
+    const ptToMm = 0.3528;
+    const numH = numFont * ptToMm;
+    const unidadH = tieneUnidad ? unidadFont * ptToMm : 0;
+    const cajasH = tieneCajas ? cajasFont * ptToMm : 0;
+    const labelH = labelFont * ptToMm;
+
+    const totalH =
+      labelH + gapLabel + numH +
+      (tieneUnidad ? gapUnidad + unidadH : 0) +
+      (tieneCajas ? gapCajas + cajasH : 0);
+
+    // baseline inicial = arriba del bloque + alto del label (texto se dibuja desde baseline)
+    let y = pageH - bottomMargin - totalH + labelH;
+
+    doc.setTextColor(...EMERALD);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(labelFont);
+    doc.text("CANTIDAD", pageW / 2, y, { align: "center" });
+
+    y += gapLabel + numH;
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(numFont);
+    doc.text(cantidadStr, pageW / 2, y, { align: "center" });
 
     if (tieneUnidad) {
+      y += gapUnidad + unidadH;
       doc.setTextColor(...EMERALD);
-      doc.setFontSize(tieneCajas ? 36 : 48);
-      doc.text(mat.unidad, pageW / 2, tieneCajas ? pageH - 38 : pageH - 18, { align: "center" });
+      doc.setFontSize(unidadFont);
+      doc.text(mat.unidad, pageW / 2, y, { align: "center" });
     }
 
     if (tieneCajas) {
+      y += gapCajas + cajasH;
       doc.setTextColor(0, 0, 0);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(28);
-      doc.text(`≈ ${mat.cajas} caja${mat.cajas! > 1 ? "s" : ""}`, pageW / 2, pageH - 15, { align: "center" });
+      doc.setFontSize(cajasFont);
+      doc.text(`≈ ${mat.cajas} caja${mat.cajas! > 1 ? "s" : ""}`, pageW / 2, y, { align: "center" });
     }
   }
 
