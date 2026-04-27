@@ -8,6 +8,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { generatePresupuestoPdf } from "@/lib/generatePdf";
 import { generateListaObraPdf } from "@/lib/generateListaObra";
 import { PresupuestoItem, Alternativa, calcularTotales } from "@/types/presupuesto";
+import { inferirUnidad, Unidad } from "@/lib/unidades";
+import UnidadesFaltantesDialog, {
+  MaterialFaltante,
+} from "@/components/UnidadesFaltantesDialog";
 import { toast } from "sonner";
 import { Search, FileDown, History, Pencil, ClipboardList } from "lucide-react";
 
@@ -33,6 +37,14 @@ const Historial = () => {
   const [presupuestos, setPresupuestos] = useState<PresupuestoRow[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+
+  // Estado del modal de unidades faltantes
+  const [pendingObra, setPendingObra] = useState<{
+    presupuesto: PresupuestoRow;
+    items: PresupuestoItem[];
+    unidadesConocidas: Record<string, string>;
+    faltantes: MaterialFaltante[];
+  } | null>(null);
 
   useEffect(() => {
     loadPresupuestos();
